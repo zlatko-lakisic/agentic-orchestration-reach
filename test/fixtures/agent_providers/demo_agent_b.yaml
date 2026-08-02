@@ -1,0 +1,4 @@
+id: demo_agent_b
+type: ollama
+model: qwen2.5:7b
+description: Second fixture agent

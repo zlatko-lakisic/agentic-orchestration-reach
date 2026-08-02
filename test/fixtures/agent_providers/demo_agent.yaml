@@ -1,0 +1,6 @@
+id: demo_agent
+type: ollama
+model: qwen2.5:3b
+ollama_host: workflow
+selfcontained: true
+description: Fixture agent for AO Reach tests
