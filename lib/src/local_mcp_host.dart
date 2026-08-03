@@ -49,18 +49,32 @@ class LocalMcpHost {
   }
 
   /// Generic `npx -y <package>` MCP behind mcp-proxy (session tunnel).
+  ///
+  /// When [package] is already installed under `~/.local/node_modules` (or npm
+  /// global root), runs `node <entry>` instead of a nested `npx -y` — Pi cold
+  /// starts otherwise exceed the health window.
   Future<void> startNpxPackage({
     required String alias,
     required String package,
     Map<String, String>? extraEnv,
+    Duration readyTimeout = const Duration(seconds: 90),
   }) async {
     await stopAlias(alias);
     final npx = await _resolveNpx();
+    final localEntry = await resolveInstalledPackageEntry(package);
+    final List<String> innerArgs;
+    if (localEntry != null) {
+      final node = await _resolveNode();
+      innerArgs = [node, localEntry];
+    } else {
+      innerArgs = [npx, '-y', package];
+    }
     await _startProxy(
       alias: alias,
       npx: npx,
-      innerArgs: [npx, '-y', package],
+      innerArgs: innerArgs,
       extraEnv: extraEnv,
+      readyTimeout: readyTimeout,
     );
   }
 
@@ -69,6 +83,7 @@ class LocalMcpHost {
     required String alias,
     required String module,
     Map<String, String>? extraEnv,
+    Duration readyTimeout = const Duration(seconds: 90),
   }) async {
     await stopAlias(alias);
     final npx = await _resolveNpx();
@@ -78,6 +93,28 @@ class LocalMcpHost {
       npx: npx,
       innerArgs: [python, '-m', module],
       extraEnv: extraEnv,
+      readyTimeout: readyTimeout,
+    );
+  }
+
+  /// Stdio MCP via an explicit command (argv[0] executable + args) behind mcp-proxy.
+  Future<void> startStdioCommand({
+    required String alias,
+    required List<String> command,
+    Map<String, String>? extraEnv,
+    Duration readyTimeout = const Duration(seconds: 90),
+  }) async {
+    if (command.isEmpty) {
+      throw StateError('startStdioCommand requires a non-empty command');
+    }
+    await stopAlias(alias);
+    final npx = await _resolveNpx();
+    await _startProxy(
+      alias: alias,
+      npx: npx,
+      innerArgs: command,
+      extraEnv: extraEnv,
+      readyTimeout: readyTimeout,
     );
   }
 
@@ -122,6 +159,7 @@ class LocalMcpHost {
     required String npx,
     required List<String> innerArgs,
     Map<String, String>? extraEnv,
+    Duration readyTimeout = const Duration(seconds: 90),
   }) async {
     final port = await _pickFreePort();
     // Pin 5.0.x: newer mcp-proxy pulls yargs that requires Node ≥20; Pi is on 18.
@@ -129,7 +167,9 @@ class LocalMcpHost {
     // separator and mcp-proxy never receives the stdio server command.
     final args = <String>[
       '-y',
-      'mcp-proxy@5.0.0',
+      // 5.12.x needs Node ≥20 (global crypto + modern regex). 5.0.0 on Node 18
+      // falsely passed health checks then crashed on initialize/tools/list.
+      'mcp-proxy@5.12.5',
       '--port',
       '$port',
       '--server',
@@ -160,11 +200,79 @@ class LocalMcpHost {
     });
 
     try {
-      await _waitHealthy(inst, timeout: const Duration(seconds: 45));
+      await _waitHealthy(inst, timeout: readyTimeout);
     } catch (e) {
       await stopAlias(alias);
       rethrow;
     }
+  }
+
+  /// Strip version from `name@version` / `@scope/name@version` for install lookup.
+  static String packageNameFromSpec(String packageSpec) {
+    final s = packageSpec.trim();
+    if (s.startsWith('@')) {
+      final at = s.lastIndexOf('@');
+      return at > 0 ? s.substring(0, at) : s;
+    }
+    final at = s.indexOf('@');
+    return at > 0 ? s.substring(0, at) : s;
+  }
+
+  /// Absolute path to a locally installed package entry (`main` / `dist/index.js`).
+  Future<String?> resolveInstalledPackageEntry(String packageSpec) async {
+    final name = packageNameFromSpec(packageSpec);
+    final roots = <String>[];
+    final home = Platform.environment['HOME']?.trim();
+    if (home != null && home.isNotEmpty) {
+      roots.add('$home/.local/node_modules/$name');
+    }
+    try {
+      final r = await Process.run('npm', ['root', '-g']);
+      if (r.exitCode == 0) {
+        final root = (r.stdout as String).trim();
+        if (root.isNotEmpty) roots.add('$root/$name');
+      }
+    } catch (_) {}
+    try {
+      final r = await Process.run('npm', ['root']);
+      if (r.exitCode == 0) {
+        final root = (r.stdout as String).trim();
+        if (root.isNotEmpty) roots.add('$root/$name');
+      }
+    } catch (_) {}
+
+    for (final dir in roots) {
+      final entry = await _packageEntryIn(dir);
+      if (entry != null) return entry;
+    }
+    return null;
+  }
+
+  Future<String?> _packageEntryIn(String dir) async {
+    final dist = File('$dir/dist/index.js');
+    if (await dist.exists()) return dist.absolute.path;
+    final pkgFile = File('$dir/package.json');
+    if (!await pkgFile.exists()) return null;
+    try {
+      final map = jsonDecode(await pkgFile.readAsString()) as Map<String, dynamic>;
+      final main = (map['main'] as String?)?.trim();
+      if (main != null && main.isNotEmpty) {
+        final f = File('$dir/$main');
+        if (await f.exists()) return f.absolute.path;
+      }
+      final bin = map['bin'];
+      if (bin is String && bin.trim().isNotEmpty) {
+        final f = File('$dir/${bin.trim()}');
+        if (await f.exists()) return f.absolute.path;
+      } else if (bin is Map && bin.isNotEmpty) {
+        final first = bin.values.first;
+        if (first is String && first.trim().isNotEmpty) {
+          final f = File('$dir/${first.trim()}');
+          if (await f.exists()) return f.absolute.path;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _appendLog(_McpInstance inst, String chunk) {
@@ -269,10 +377,29 @@ class LocalMcpHost {
             Uri.parse('http://127.0.0.1:${inst.port}/mcp'),
           );
           req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-          req.add(utf8.encode('{"jsonrpc":"2.0","id":1,"method":"ping"}'));
-          final res = await req.close().timeout(const Duration(seconds: 2));
-          await res.drain<void>();
-          if (res.statusCode > 0) return;
+          req.headers.set(
+            HttpHeaders.acceptHeader,
+            'application/json, text/event-stream',
+          );
+          // Real initialize — ping alone returned 400 on broken Node 18 stacks
+          // and was treated as healthy (statusCode > 0).
+          req.add(utf8.encode(
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":'
+            '{"protocolVersion":"2024-11-05","capabilities":{},'
+            '"clientInfo":{"name":"ao-reach-health","version":"0"}}}',
+          ));
+          final res = await req.close().timeout(const Duration(seconds: 3));
+          final body = await utf8.decoder.bind(res).join();
+          if (res.statusCode >= 200 &&
+              res.statusCode < 300 &&
+              !body.contains('"error"') &&
+              (body.contains('initialize') ||
+                  body.contains('protocolVersion') ||
+                  body.contains('serverInfo') ||
+                  body.contains('capabilities'))) {
+            return;
+          }
+          lastError = 'HTTP ${res.statusCode}: ${body.length > 200 ? body.substring(0, 200) : body}';
         } finally {
           client.close(force: true);
         }
@@ -321,6 +448,46 @@ class LocalMcpHost {
     throw StateError(
       'npx not found — install Node.js to run local MCP bridges '
       '(mcp-proxy + filesystem / tool servers).',
+    );
+  }
+
+  Future<String> _resolveNode() async {
+    final candidates = Platform.isWindows
+        ? <String>['node.exe', 'node']
+        : <String>['node'];
+    for (final c in candidates) {
+      try {
+        final r = await Process.run(
+          c,
+          ['--version'],
+          runInShell: Platform.isWindows,
+        );
+        if (r.exitCode == 0) {
+          final ver = (r.stdout as String).trim();
+          // mcp-proxy ≥5.1 and Workspace MCP need Node ≥20 (global crypto).
+          final m = RegExp(r'v?(\d+)').firstMatch(ver);
+          final major = int.tryParse(m?.group(1) ?? '') ?? 0;
+          if (major >= 20) return c;
+        }
+      } catch (_) {}
+    }
+    final which = Platform.isWindows ? 'where' : 'which';
+    try {
+      final r = await Process.run(which, ['node'], runInShell: Platform.isWindows);
+      if (r.exitCode == 0) {
+        final line = (r.stdout as String).trim().split('\n').first.trim();
+        if (line.isNotEmpty) {
+          final v = await Process.run(line, ['--version']);
+          final ver = (v.stdout as String).trim();
+          final m = RegExp(r'v?(\d+)').firstMatch(ver);
+          final major = int.tryParse(m?.group(1) ?? '') ?? 0;
+          if (major >= 20) return line;
+        }
+      }
+    } catch (_) {}
+    throw StateError(
+      'Node.js ≥20 required for local MCP packages (found older or missing). '
+      'Install Node 20+ and ensure it is first on PATH.',
     );
   }
 

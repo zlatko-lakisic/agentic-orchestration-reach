@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -512,7 +513,12 @@ class SessionBridge {
 
     try {
       final method = (msg['method']?.toString() ?? 'POST').toUpperCase();
-      final path = msg['path']?.toString() ?? '/mcp';
+      var path = msg['path']?.toString() ?? '/mcp';
+      // AO often sends tunnel path "/" for the MCP base URL; mcp-proxy serves
+      // streamable HTTP at /mcp (see LocalMcpHost --streamEndpoint).
+      if (path.isEmpty || path == '/') {
+        path = '/mcp';
+      }
       final headersRaw = msg['headers'];
       final headers = <String, String>{};
       if (headersRaw is Map) {
@@ -529,14 +535,20 @@ class SessionBridge {
         headers: headers,
         body: body,
       );
+      final sanitized = sanitizeMcpTunnelBody(result.body);
+      stderr.writeln(
+        'mcp_tunnel ok alias=$tunnelPath method=$method '
+        'path=$path status=${result.status} bytes=${sanitized.length}',
+      );
       _send({
         'type': 'mcp_tunnel_response',
         'requestId': requestId,
         'status': result.status,
         'headers': result.headers,
-        'bodyBase64': base64Encode(result.body),
+        'bodyBase64': base64Encode(sanitized),
       });
     } catch (e) {
+      stderr.writeln('mcp_tunnel fail alias=$tunnelPath err=$e');
       _send({
         'type': 'mcp_tunnel_response',
         'requestId': requestId,
@@ -547,6 +559,22 @@ class SessionBridge {
         ),
       });
     }
+  }
+
+  /// CrewAI rejects JSON Schema union types like `type: ["string","array"]`
+  /// from mcp-server-google-workspace (gmail_send_email), which aborts *all*
+  /// tool loading for that MCP — including calendar. Soften unions to string.
+  static List<int> sanitizeMcpTunnelBody(List<int> body) {
+    if (body.isEmpty) return body;
+    final text = utf8.decode(body, allowMalformed: true);
+    if (!text.contains('"type"') || !text.contains('array')) return body;
+    final fixed = text
+        .replaceAll(RegExp(r'"type"\s*:\s*\[\s*"string"\s*,\s*"array"\s*\]'), '"type":"string"')
+        .replaceAll(RegExp(r'"type"\s*:\s*\[\s*"array"\s*,\s*"string"\s*\]'), '"type":"string"')
+        .replaceAll("type: ['string', 'array']", "type: 'string'")
+        .replaceAll('type: ["string", "array"]', 'type: "string"');
+    if (identical(fixed, text) || fixed == text) return body;
+    return utf8.encode(fixed);
   }
 
   void _send(Map<String, dynamic> payload) {

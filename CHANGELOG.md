@@ -4,6 +4,18 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Changed
+
+- **LocalMcpHost** — require Node.js ≥20; pin `mcp-proxy@5.12.5`; health-check
+  with MCP `initialize` (not bare ping) so broken stacks fail bootstrap instead
+  of soft-passing then cancelling tool discovery.
+- **LocalMcpHost.startNpxPackage** — prefer a locally installed package entry
+  (`~/.local/node_modules` / npm roots) via `node <main>` to avoid nested `npx`
+  cold starts; default ready timeout 90s. Added `startStdioCommand` and
+  `resolveInstalledPackageEntry`.
+- **SessionBridge MCP tunnel** — map AO tunnel `path=/` → `/mcp`; sanitize
+  CrewAI-incompatible JSON Schema union types in tool descriptors.
+
 ## [0.2.1] - 2026-08-03
 
 ### Changed

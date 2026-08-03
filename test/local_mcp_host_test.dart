@@ -61,4 +61,11 @@ void main() {
     final host = LocalMcpHost();
     await expectLater(host.startFilesystem(const []), throwsA(isA<StateError>()));
   });
+
+  test('packageNameFromSpec strips versions', () {
+    expect(LocalMcpHost.packageNameFromSpec('mcp-server-google-workspace@0.2.6'),
+        'mcp-server-google-workspace');
+    expect(LocalMcpHost.packageNameFromSpec('@scope/pkg@1.0.0'), '@scope/pkg');
+    expect(LocalMcpHost.packageNameFromSpec('plain'), 'plain');
+  });
 }
