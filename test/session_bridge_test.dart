@@ -145,6 +145,7 @@ void main() {
     bool tunnel = true,
     List<String>? mcpIds,
     SessionMcpBootstrap? bootstrap,
+    Map<String, dynamic>? speech,
   }) async {
     final startFuture = bridge.start(
       config: config(),
@@ -156,6 +157,7 @@ void main() {
       'type': 'hello',
       'sessionOverlay': overlay,
       'mcpTunnel': tunnel,
+      if (speech != null) 'speech': speech,
     });
     final reg = await server.waitForType('session_overlay_register');
     expect(reg['ttlSeconds'], 120);
@@ -191,6 +193,7 @@ void main() {
     await completeHandshake();
     expect(bridge.state, SessionBridgeState.active);
     expect(bridge.sessionOverlay, isTrue);
+    expect(bridge.speechClient, isNull);
     expect(bridge.registeredAgentIds, contains('client.demo_agent'));
     final reg = server.clientMessages
         .firstWhere((m) => m['type'] == 'session_overlay_register');
@@ -198,6 +201,19 @@ void main() {
     final demo = agents.firstWhere((a) => a['id'] == 'client.demo_agent');
     expect(demo.containsKey('ollama_host'), isFalse);
     expect(demo['selfcontained'], isFalse);
+  });
+
+  test('hello speech advertises SpeechClient', () async {
+    await completeHandshake(speech: {
+      'enabled': true,
+      'sttBaseUrl': 'http://10.0.0.5:8090',
+      'ttsBaseUrl': 'http://10.0.0.5:8091',
+      'auth': 'bearer',
+    });
+    expect(bridge.speech, isNotNull);
+    expect(bridge.speechClient, isNotNull);
+    expect(bridge.speech!.sttBaseUrl, 'http://10.0.0.5:8090');
+    expect(bridge.speech!.authBearer, isTrue);
   });
 
   test('progress chunks update registerProgress before ack', () async {

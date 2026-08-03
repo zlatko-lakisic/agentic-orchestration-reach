@@ -10,6 +10,7 @@ class ReachConnectionConfig {
     this.ttlSeconds = 3600,
     this.questionIdPrefix = 'reach',
     this.maxReconnectAttempts = 1,
+    this.speechToken,
   });
 
   /// HTTP(S) base URL of the AO daemon (e.g. `https://host/@warpgate/...`).
@@ -30,6 +31,9 @@ class ReachConnectionConfig {
   /// How many times to retry after a socket drop while active/connecting.
   final int maxReconnectAttempts;
 
+  /// Optional bearer for AO speech sidecars (`AGENTIC_SPEECH_TOKEN`).
+  final String? speechToken;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -37,6 +41,7 @@ class ReachConnectionConfig {
     int? ttlSeconds,
     String? questionIdPrefix,
     int? maxReconnectAttempts,
+    String? speechToken,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -45,6 +50,7 @@ class ReachConnectionConfig {
       ttlSeconds: ttlSeconds ?? this.ttlSeconds,
       questionIdPrefix: questionIdPrefix ?? this.questionIdPrefix,
       maxReconnectAttempts: maxReconnectAttempts ?? this.maxReconnectAttempts,
+      speechToken: speechToken ?? this.speechToken,
     );
   }
 }

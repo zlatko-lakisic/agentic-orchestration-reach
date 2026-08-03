@@ -4,6 +4,12 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-03
+
+### Added
+
+- **SpeechClient** — when AO ≥ 1.28 advertises `speech` on WebSocket `hello`, `SessionBridge.speechClient` exposes OpenAI-compatible STT (`transcribe`) and TTS (`synthesize`) over HTTP to AO-packaged sidecars. Optional `ReachConnectionConfig.speechToken` for `AGENTIC_SPEECH_TOKEN`. Absent/disabled speech leaves overlay behavior unchanged (`speechClient == null`).
+
 ## [0.1.0] - 2026-08-01
 
 ### Added

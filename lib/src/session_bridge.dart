@@ -9,6 +9,7 @@ import 'ids.dart';
 import 'local_mcp_host.dart';
 import 'mcp_bootstrap.dart';
 import 'overlay_packer.dart';
+import 'speech_client.dart';
 
 enum SessionBridgeState {
   idle,
@@ -31,7 +32,8 @@ typedef ReachWsConnect = WebSocketChannel Function(
 ///
 /// Opens `/ws` with caller-supplied headers, registers `client.*` agents via
 /// [OverlayPacker], answers `mcp_tunnel_request`, and runs `direct_agent` on
-/// the owning socket (REST does not bind overlay context in v1.27.x).
+/// the owning socket. When AO ≥ 1.28 advertises `speech` on hello, use
+/// [speechClient] for OpenAI-compatible STT/TTS HTTP (sidecars — not WS).
 class SessionBridge {
   SessionBridge({
     OverlayPacker? packer,
@@ -52,11 +54,13 @@ class SessionBridge {
   Completer<Map<String, dynamic>>? _clearedWait;
   bool _stopping = false;
   final Map<String, _PendingDirectRun> _pendingRuns = {};
+  SpeechClient? _speechClient;
 
   SessionBridgeState state = SessionBridgeState.idle;
   String? error;
   bool sessionOverlay = false;
   bool mcpTunnel = false;
+  SpeechCapabilities? speech;
   List<String> registeredAgentIds = const [];
   List<String> registeredMcpIds = const [];
   double? expiresAt;
@@ -87,6 +91,9 @@ class SessionBridge {
       calendarGoogleMcpActive ? clientCalendarGoogleMcpId : null;
 
   LocalMcpHost get mcpHost => _mcpHost;
+
+  /// Non-null when the remote AO advertised speech sidecars on `hello`.
+  SpeechClient? get speechClient => _speechClient;
 
   /// Run `direct_agent` on the owning session WebSocket.
   Future<Map<String, dynamic>> directAgent({
@@ -221,6 +228,15 @@ class SessionBridge {
     }
     sessionOverlay = hello['sessionOverlay'] == true;
     mcpTunnel = hello['mcpTunnel'] == true;
+    _disposeSpeechClient();
+    speech = SpeechCapabilities.tryParse(hello['speech']);
+    if (speech != null) {
+      _speechClient = SpeechClient(
+        capabilities: speech!,
+        headers: config.headers,
+        speechToken: config.speechToken,
+      );
+    }
     if (!sessionOverlay) {
       throw StateError(
         'Remote AO does not advertise sessionOverlay '
@@ -551,9 +567,17 @@ class SessionBridge {
     calendarGoogleMcpActive = false;
     activeTunnelBareIds = const [];
     clientMcpWarnings = const [];
+    speech = null;
     error = null;
     _reconnectAttempts = 0;
     _emit();
+  }
+
+  void _disposeSpeechClient() {
+    try {
+      _speechClient?.close();
+    } catch (_) {}
+    _speechClient = null;
   }
 
   Future<void> _cleanupLocal({required bool clearRemote}) async {
@@ -585,6 +609,7 @@ class SessionBridge {
     try {
       await _mcpHost.stop();
     } catch (_) {}
+    _disposeSpeechClient();
     filesystemMcpActive = false;
     emailGmailMcpActive = false;
     calendarGoogleMcpActive = false;

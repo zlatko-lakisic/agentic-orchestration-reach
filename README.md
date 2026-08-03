@@ -15,6 +15,7 @@ Product name: **AO Reach**
 - AO daemon ≥ **v1.27.0** with:
   - `AGENTIC_SERVE_SESSION_OVERLAY=1`
   - `AGENTIC_SERVE_MCP_TUNNEL=1` (when registering `tunnel://session-mcp/…` MCPs)
+- Optional speech (AO ≥ **v1.28.0**): `AGENTIC_SPEECH_ENABLED=1` + sidecars — see AO `speech/README.md`
 - Dart SDK ^3.5
 - Node.js `npx` when spawning stdio MCPs via `LocalMcpHost`
 
@@ -25,7 +26,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.1.0
+      ref: v0.2.0
 ```
 
 ## Quick start
@@ -58,17 +59,32 @@ final result = await bridge.directAgent(
 await bridge.stop();
 ```
 
+### Speech (optional, AO ≥ 1.28)
+
+When the engine advertises `speech` on `hello`:
+
+```dart
+final speech = bridge.speechClient;
+if (speech != null) {
+  final text = await speech.transcribe(wavBytes);
+  final wav = await speech.synthesize('Hello');
+}
+```
+
+Pass `speechToken` on `ReachConnectionConfig` when sidecars require `AGENTIC_SPEECH_TOKEN`. Audio stays on HTTP to the sidecars — not on the session WebSocket.
+
 Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to start and which overlay MCP entries to register. Reach stays product-agnostic.
 
 ## Layout
 
 | Module | Role |
 |--------|------|
-| `SessionBridge` | WS lifecycle, overlay register/clear, tunnel responder, `direct_agent` |
+| `SessionBridge` | WS lifecycle, overlay register/clear, tunnel responder, `direct_agent`, speech discovery |
+| `SpeechClient` | OpenAI-compatible STT/TTS HTTP against AO-advertised sidecars |
 | `LocalMcpHost` | Loopback `mcp-proxy` for stdio MCPs |
 | `OverlayPacker` | YAML → `client.*` agents + MCP entries |
 | `McpSessionSpec` | Declares stdio-tunnel vs hosted HTTP MCPs |
-| `ReachConnectionConfig` | Base URL, headers, TTL |
+| `ReachConnectionConfig` | Base URL, headers, TTL, optional speech token |
 
 ## Tests
 
