@@ -84,6 +84,34 @@ class LocalMcpHost {
   /// Legacy name used by older call sites / tests.
   Future<void> start(List<String> allowlistDirs) => startFilesystem(allowlistDirs);
 
+  /// Attach a managed loopback HTTP MCP process (e.g. Python streamable HTTP).
+  ///
+  /// Unlike [attachLoopbackAlias], [process] is tracked and killed by [stopAlias].
+  Future<void> attachManagedLoopback({
+    required String alias,
+    required int port,
+    required Process process,
+    Duration readyTimeout = const Duration(seconds: 20),
+  }) async {
+    await stopAlias(alias);
+    final inst = _McpInstance(alias: alias, port: port, process: process);
+    _byAlias[alias] = inst;
+
+    process.stdout.transform(utf8.decoder).listen((chunk) {
+      _appendLog(inst, chunk);
+    });
+    process.stderr.transform(utf8.decoder).listen((chunk) {
+      _appendLog(inst, chunk);
+    });
+
+    try {
+      await _waitHealthy(inst, timeout: readyTimeout);
+    } catch (e) {
+      await stopAlias(alias);
+      rethrow;
+    }
+  }
+
   /// Attach an already-listening loopback HTTP port as a tunnel alias (tests / custom hosts).
   void attachLoopbackAlias(String alias, int port) {
     _byAlias[alias] = _McpInstance(alias: alias, port: port, process: null);
@@ -96,20 +124,18 @@ class LocalMcpHost {
     Map<String, String>? extraEnv,
   }) async {
     final port = await _pickFreePort();
+    // Pin 5.0.x: newer mcp-proxy pulls yargs that requires Node ≥20; Pi is on 18.
+    // Do not insert a npx argv separator before innerArgs: npx treats "--" as its own
+    // separator and mcp-proxy never receives the stdio server command.
     final args = <String>[
       '-y',
-      'mcp-proxy',
-      '--host',
-      '127.0.0.1',
+      'mcp-proxy@5.0.0',
       '--port',
       '$port',
       '--server',
       'stream',
-      '--stateless',
-      '--no-eventStore',
       '--streamEndpoint',
       '/mcp',
-      '--',
       ...innerArgs,
     ];
 
@@ -260,6 +286,8 @@ class LocalMcpHost {
       'Last error: $lastError\n${inst.log.toString().trim()}',
     );
   }
+
+  Future<int> pickFreePort() => _pickFreePort();
 
   Future<int> _pickFreePort() async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);

@@ -4,6 +4,15 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-03
+
+### Changed
+
+- **LocalMcpHost** — pin `mcp-proxy@5.0.0` (Node 18 compatible); drop unsupported
+  flags and the `npx --` separator that swallowed the stdio server command.
+- **LocalMcpHost.attachManagedLoopback** / **pickFreePort** — manage a product-owned
+  loopback HTTP MCP process (e.g. Python streamable HTTP) without mcp-proxy.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added
