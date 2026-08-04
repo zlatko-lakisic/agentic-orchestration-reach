@@ -4,6 +4,17 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
+### Added
+
+- **Speech URL overrides** — `ReachConnectionConfig.speechSttBaseUrlOverride` /
+  `speechTtsBaseUrlOverride` replace advertised STT/TTS bases after `hello.speech`
+  parse (AO must still advertise speech).
+- **`TranscriptionResult` / `transcribeDetailed`** — optional confidence fields
+  (`avgLogprob`, `noSpeechProb`, …) when the sidecar JSON includes them.
+  Existing `transcribe` remains a thin wrapper returning `.text`.
+
 ### Changed
 
 - **LocalMcpHost** — require Node.js ≥20; pin `mcp-proxy@5.12.5`; health-check

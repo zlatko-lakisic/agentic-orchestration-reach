@@ -232,6 +232,10 @@ class SessionBridge {
     _disposeSpeechClient();
     speech = SpeechCapabilities.tryParse(hello['speech']);
     if (speech != null) {
+      speech = speech!.withOverrides(
+        sttBaseUrl: config.speechSttBaseUrlOverride,
+        ttsBaseUrl: config.speechTtsBaseUrlOverride,
+      );
       _speechClient = SpeechClient(
         capabilities: speech!,
         headers: config.headers,

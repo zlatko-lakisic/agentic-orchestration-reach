@@ -126,7 +126,12 @@ void main() {
     } catch (_) {}
   });
 
-  ReachConnectionConfig config({bool enabled = true, int maxReconnect = 0}) =>
+  ReachConnectionConfig config({
+    bool enabled = true,
+    int maxReconnect = 0,
+    String? speechSttBaseUrlOverride,
+    String? speechTtsBaseUrlOverride,
+  }) =>
       ReachConnectionConfig(
         baseUrl: server.httpBase,
         headers: const {
@@ -138,6 +143,8 @@ void main() {
         ttlSeconds: 120,
         questionIdPrefix: 'test',
         maxReconnectAttempts: maxReconnect,
+        speechSttBaseUrlOverride: speechSttBaseUrlOverride,
+        speechTtsBaseUrlOverride: speechTtsBaseUrlOverride,
       );
 
   Future<void> completeHandshake({
@@ -146,9 +153,10 @@ void main() {
     List<String>? mcpIds,
     SessionMcpBootstrap? bootstrap,
     Map<String, dynamic>? speech,
+    ReachConnectionConfig? connectionConfig,
   }) async {
     final startFuture = bridge.start(
-      config: config(),
+      config: connectionConfig ?? config(),
       overlayRoot: tempDir.path,
       mcpBootstrap: bootstrap ?? const EmptySessionMcpBootstrap(),
     );
@@ -214,6 +222,23 @@ void main() {
     expect(bridge.speechClient, isNotNull);
     expect(bridge.speech!.sttBaseUrl, 'http://10.0.0.5:8090');
     expect(bridge.speech!.authBearer, isTrue);
+  });
+
+  test('speech URL overrides replace advertised bases', () async {
+    await completeHandshake(
+      connectionConfig: config(
+        speechSttBaseUrlOverride: 'http://10.0.0.5:8093/',
+        speechTtsBaseUrlOverride: 'http://10.0.0.5:8092',
+      ),
+      speech: {
+        'enabled': true,
+        'sttBaseUrl': 'http://10.0.0.5:8090',
+        'ttsBaseUrl': 'http://10.0.0.5:8091',
+      },
+    );
+    expect(bridge.speech!.sttBaseUrl, 'http://10.0.0.5:8093');
+    expect(bridge.speech!.ttsBaseUrl, 'http://10.0.0.5:8092');
+    expect(bridge.speechClient, isNotNull);
   });
 
   test('progress chunks update registerProgress before ack', () async {

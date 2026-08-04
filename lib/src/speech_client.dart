@@ -43,8 +43,95 @@ class SpeechCapabilities {
     );
   }
 
+  /// Replace base URLs when [sttBaseUrl] / [ttsBaseUrl] are non-empty after trim.
+  SpeechCapabilities withOverrides({String? sttBaseUrl, String? ttsBaseUrl}) {
+    String? normalize(String? raw) {
+      final t = raw?.trim() ?? '';
+      if (t.isEmpty) return null;
+      return t.replaceAll(RegExp(r'/+$'), '');
+    }
+
+    final stt = normalize(sttBaseUrl);
+    final tts = normalize(ttsBaseUrl);
+    if (stt == null && tts == null) return this;
+    return SpeechCapabilities(
+      sttBaseUrl: stt ?? this.sttBaseUrl,
+      ttsBaseUrl: tts ?? this.ttsBaseUrl,
+      transcribePath: transcribePath,
+      speechPath: speechPath,
+      openaiCompatible: openaiCompatible,
+      authBearer: authBearer,
+    );
+  }
+
   Uri get transcribeUri => Uri.parse('$sttBaseUrl$transcribePath');
   Uri get speechUri => Uri.parse('$ttsBaseUrl$speechPath');
+}
+
+/// Result of OpenAI-compatible STT, including optional confidence fields.
+class TranscriptionResult {
+  const TranscriptionResult({
+    required this.text,
+    this.language,
+    this.languageProbability,
+    this.avgLogprob,
+    this.noSpeechProb,
+    this.compressionRatio,
+    this.durationSec,
+  });
+
+  final String text;
+  final String? language;
+  final double? languageProbability;
+  final double? avgLogprob;
+  final double? noSpeechProb;
+  final double? compressionRatio;
+  final double? durationSec;
+
+  bool get isEmpty => text.trim().isEmpty;
+
+  static TranscriptionResult fromJson(Map<dynamic, dynamic> map) {
+    if (map['text'] == null) {
+      throw StateError('STT response missing text field');
+    }
+    double? numField(List<String> keys) {
+      for (final k in keys) {
+        final v = map[k];
+        if (v is num) return v.toDouble();
+        if (v is String) {
+          final parsed = double.tryParse(v.trim());
+          if (parsed != null) return parsed;
+        }
+      }
+      return null;
+    }
+
+    String? strField(List<String> keys) {
+      for (final k in keys) {
+        final v = map[k];
+        if (v == null) continue;
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+      return null;
+    }
+
+    return TranscriptionResult(
+      text: map['text'].toString(),
+      language: strField(const ['language']),
+      languageProbability: numField(const [
+        'language_probability',
+        'languageProbability',
+      ]),
+      avgLogprob: numField(const ['avg_logprob', 'avgLogprob']),
+      noSpeechProb: numField(const ['no_speech_prob', 'noSpeechProb']),
+      compressionRatio: numField(const [
+        'compression_ratio',
+        'compressionRatio',
+      ]),
+      durationSec: numField(const ['duration', 'duration_sec', 'durationSec']),
+    );
+  }
 }
 
 /// HTTP client for AO-advertised OpenAI-compatible STT/TTS sidecars.
@@ -77,8 +164,22 @@ class SpeechClient {
     return out;
   }
 
-  /// Transcribe audio bytes (WAV/PCM container as accepted by the sidecar).
+  /// Transcribe audio bytes; returns text only (back-compat).
   Future<String> transcribe(
+    List<int> audioBytes, {
+    String filename = 'audio.wav',
+    String language = 'en',
+  }) async {
+    return (await transcribeDetailed(
+      audioBytes,
+      filename: filename,
+      language: language,
+    ))
+        .text;
+  }
+
+  /// Transcribe with optional confidence / no-speech fields when the sidecar sends them.
+  Future<TranscriptionResult> transcribeDetailed(
     List<int> audioBytes, {
     String filename = 'audio.wav',
     String language = 'en',
@@ -97,10 +198,10 @@ class SpeechClient {
       );
     }
     final decoded = jsonDecode(utf8.decode(body));
-    if (decoded is Map && decoded['text'] != null) {
-      return decoded['text'].toString();
+    if (decoded is! Map) {
+      throw StateError('STT response missing text field');
     }
-    throw StateError('STT response missing text field');
+    return TranscriptionResult.fromJson(decoded);
   }
 
   /// Synthesize [text] to WAV bytes.

@@ -11,6 +11,8 @@ class ReachConnectionConfig {
     this.questionIdPrefix = 'reach',
     this.maxReconnectAttempts = 1,
     this.speechToken,
+    this.speechSttBaseUrlOverride,
+    this.speechTtsBaseUrlOverride,
   });
 
   /// HTTP(S) base URL of the AO daemon (e.g. `https://host/@warpgate/...`).
@@ -34,6 +36,12 @@ class ReachConnectionConfig {
   /// Optional bearer for AO speech sidecars (`AGENTIC_SPEECH_TOKEN`).
   final String? speechToken;
 
+  /// When non-empty, replace advertised STT base URL after hello parse.
+  final String? speechSttBaseUrlOverride;
+
+  /// When non-empty, replace advertised TTS base URL after hello parse.
+  final String? speechTtsBaseUrlOverride;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -42,6 +50,8 @@ class ReachConnectionConfig {
     String? questionIdPrefix,
     int? maxReconnectAttempts,
     String? speechToken,
+    String? speechSttBaseUrlOverride,
+    String? speechTtsBaseUrlOverride,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -51,6 +61,10 @@ class ReachConnectionConfig {
       questionIdPrefix: questionIdPrefix ?? this.questionIdPrefix,
       maxReconnectAttempts: maxReconnectAttempts ?? this.maxReconnectAttempts,
       speechToken: speechToken ?? this.speechToken,
+      speechSttBaseUrlOverride:
+          speechSttBaseUrlOverride ?? this.speechSttBaseUrlOverride,
+      speechTtsBaseUrlOverride:
+          speechTtsBaseUrlOverride ?? this.speechTtsBaseUrlOverride,
     );
   }
 }

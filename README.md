@@ -26,7 +26,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.2.0
+      ref: v0.3.0
 ```
 
 ## Quick start
@@ -67,11 +67,14 @@ When the engine advertises `speech` on `hello`:
 final speech = bridge.speechClient;
 if (speech != null) {
   final text = await speech.transcribe(wavBytes);
+  final detailed = await speech.transcribeDetailed(wavBytes);
+  // detailed.avgLogprob / noSpeechProb when sidecar sends them
   final wav = await speech.synthesize('Hello');
 }
 ```
 
-Pass `speechToken` on `ReachConnectionConfig` when sidecars require `AGENTIC_SPEECH_TOKEN`. Audio stays on HTTP to the sidecars — not on the session WebSocket.
+Pass `speechToken` on `ReachConnectionConfig` when sidecars require `AGENTIC_SPEECH_TOKEN`.  
+Optional `speechSttBaseUrlOverride` / `speechTtsBaseUrlOverride` replace advertised bases after hello (AO must still advertise speech). Audio stays on HTTP to the sidecars — not on the session WebSocket.
 
 Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to start and which overlay MCP entries to register. Reach stays product-agnostic.
 
@@ -80,11 +83,11 @@ Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to
 | Module | Role |
 |--------|------|
 | `SessionBridge` | WS lifecycle, overlay register/clear, tunnel responder, `direct_agent`, speech discovery |
-| `SpeechClient` | OpenAI-compatible STT/TTS HTTP against AO-advertised sidecars |
+| `SpeechClient` | OpenAI-compatible STT/TTS HTTP; `transcribe` / `transcribeDetailed` / `synthesize` |
 | `LocalMcpHost` | Loopback `mcp-proxy` for stdio MCPs |
 | `OverlayPacker` | YAML → `client.*` agents + MCP entries |
 | `McpSessionSpec` | Declares stdio-tunnel vs hosted HTTP MCPs |
-| `ReachConnectionConfig` | Base URL, headers, TTL, optional speech token |
+| `ReachConnectionConfig` | Base URL, headers, TTL, speech token + optional STT/TTS URL overrides |
 
 ## Tests
 
