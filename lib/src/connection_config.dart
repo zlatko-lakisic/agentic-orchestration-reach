@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'mtls.dart';
+
 /// Connection settings for AO Reach (product apps map their own settings here).
 class ReachConnectionConfig {
   const ReachConnectionConfig({
@@ -13,12 +15,17 @@ class ReachConnectionConfig {
     this.speechToken,
     this.speechSttBaseUrlOverride,
     this.speechTtsBaseUrlOverride,
+    this.mtls,
   });
 
-  /// HTTP(S) base URL of the AO daemon (e.g. `https://host/@warpgate/...`).
+  /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
+  ///
+  /// Reach talks to the engine directly — not via Warpgate. Use `https` when
+  /// [mtls] is set.
   final String baseUrl;
 
-  /// Headers for REST + WebSocket handshake (identity, Warpgate token/cookie, …).
+  /// Headers for REST + WebSocket handshake (optional session id, etc.).
+  /// Under mTLS, user identity comes from the client certificate.
   final Map<String, String> headers;
 
   /// When false, [SessionBridge.start] is a no-op (idle).
@@ -42,6 +49,9 @@ class ReachConnectionConfig {
   /// When non-empty, replace advertised TTS base URL after hello parse.
   final String? speechTtsBaseUrlOverride;
 
+  /// Mutual TLS material for the engine WebSocket (and speech HTTP when set).
+  final ReachMtlsConfig? mtls;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -52,6 +62,7 @@ class ReachConnectionConfig {
     String? speechToken,
     String? speechSttBaseUrlOverride,
     String? speechTtsBaseUrlOverride,
+    ReachMtlsConfig? mtls,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -65,6 +76,7 @@ class ReachConnectionConfig {
           speechSttBaseUrlOverride ?? this.speechSttBaseUrlOverride,
       speechTtsBaseUrlOverride:
           speechTtsBaseUrlOverride ?? this.speechTtsBaseUrlOverride,
+      mtls: mtls ?? this.mtls,
     );
   }
 }

@@ -16,8 +16,10 @@ Product name: **AO Reach**
   - `AGENTIC_SERVE_SESSION_OVERLAY=1`
   - `AGENTIC_SERVE_MCP_TUNNEL=1` (when registering `tunnel://session-mcp/…` MCPs)
 - Optional speech (AO ≥ **v1.28.0**): `AGENTIC_SPEECH_ENABLED=1` + sidecars — see AO `speech/README.md`
+- Optional mTLS (AO ≥ **v1.29.0**): engine TLS + client certs — see **mTLS** below
 - Dart SDK ^3.5
 - Node.js `npx` when spawning stdio MCPs via `LocalMcpHost`
+- `openssl` on PATH when using `ReachMtlsEnroller`
 
 ## Install
 
@@ -26,7 +28,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.3.0
+      ref: v0.4.0
 ```
 
 ## Quick start
@@ -38,11 +40,9 @@ final bridge = SessionBridge();
 
 await bridge.start(
   config: ReachConnectionConfig(
-    baseUrl: 'https://your-ao-host',
+    baseUrl: 'https://ao-host:8765',
     headers: {
-      'x-agentic-user-name': 'alice',
       'x-agentic-session-id': 'sess-1',
-      'x-warpgate-token': token,
     },
     ttlSeconds: 3600,
   ),
@@ -76,6 +76,37 @@ if (speech != null) {
 Pass `speechToken` on `ReachConnectionConfig` when sidecars require `AGENTIC_SPEECH_TOKEN`.  
 Optional `speechSttBaseUrlOverride` / `speechTtsBaseUrlOverride` replace advertised bases after hello (AO must still advertise speech). Audio stays on HTTP to the sidecars — not on the session WebSocket.
 
+### mTLS (optional, AO ≥ 1.29)
+
+Reach talks to the AO **engine** directly (`https://host:8765` / `wss://…/ws`). On the AO host:
+
+```bash
+python -m orchestration.serve.mtls init-ca
+python -m orchestration.serve.mtls issue-server --cn ao-engine
+python -m orchestration.serve.mtls mint-token --client-name alice
+# export AGENTIC_SERVE_TLS_CERTFILE/KEYFILE/CA_FILE to the printed paths
+```
+
+In the app:
+
+```dart
+final material = await ReachMtlsEnroller().enroll(
+  baseUrl: 'https://ao-host:8765',
+  enrollToken: tokenFromAdmin,
+  materialDir: '${Platform.environment['HOME']}/.myapp/ao-mtls',
+  trustEnrollmentCa: true, // or pass caPem from GET /api/v1/mtls/ca
+);
+await bridge.start(
+  config: ReachConnectionConfig(
+    baseUrl: 'https://ao-host:8765',
+    headers: const {},
+    mtls: ReachMtlsConfig(materialDir: material.dir),
+  ),
+  overlayRoot: overlayRoot,
+  mcpBootstrap: bootstrap,
+);
+```
+
 Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to start and which overlay MCP entries to register. Reach stays product-agnostic.
 
 ## Layout
@@ -87,7 +118,8 @@ Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to
 | `LocalMcpHost` | Loopback `mcp-proxy` for stdio MCPs |
 | `OverlayPacker` | YAML → `client.*` agents + MCP entries |
 | `McpSessionSpec` | Declares stdio-tunnel vs hosted HTTP MCPs |
-| `ReachConnectionConfig` | Base URL, headers, TTL, speech token + optional STT/TTS URL overrides |
+| `ReachConnectionConfig` | Base URL, headers, TTL, speech, optional `mtls` |
+| `ReachMtlsEnroller` | Token enroll → persist `cert.pem` / `key.pem` / `ca.pem` |
 
 ## Tests
 

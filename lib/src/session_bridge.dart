@@ -9,6 +9,7 @@ import 'connection_config.dart';
 import 'ids.dart';
 import 'local_mcp_host.dart';
 import 'mcp_bootstrap.dart';
+import 'mtls.dart';
 import 'overlay_packer.dart';
 import 'speech_client.dart';
 
@@ -185,6 +186,13 @@ class SessionBridge {
     required String overlayRoot,
     required SessionMcpBootstrap mcpBootstrap,
   }) async {
+    final mtlsConfig = config.mtls;
+    ReachMtlsMaterial? mtlsMaterial;
+    if (mtlsConfig != null && mtlsConfig.isConfigured) {
+      assertReachMtlsUsesTls(config.baseUrl);
+      mtlsMaterial = loadReachMtlsMaterial(mtlsConfig);
+    }
+
     final wsUrl = reachWsUri(config.baseUrl);
     final headers = Map<String, dynamic>.from(config.headers);
     // WebSocket handshake: drop Accept: application/json (some proxies are picky).
@@ -193,11 +201,21 @@ class SessionBridge {
     final helloWait = Completer<Map<String, dynamic>>();
     _helloWait = helloWait;
 
-    final channel = _wsConnect(
-      wsUrl,
-      headers: headers,
-      pingInterval: const Duration(seconds: 20),
-    );
+    final WebSocketChannel channel;
+    if (mtlsMaterial != null && identical(_wsConnect, _defaultWsConnect)) {
+      channel = _mtlsWsConnect(
+        wsUrl,
+        material: mtlsMaterial,
+        headers: headers,
+        pingInterval: const Duration(seconds: 20),
+      );
+    } else {
+      channel = _wsConnect(
+        wsUrl,
+        headers: headers,
+        pingInterval: const Duration(seconds: 20),
+      );
+    }
     _channel = channel;
     _sub = channel.stream.listen(
       _onMessage,
@@ -240,6 +258,7 @@ class SessionBridge {
         capabilities: speech!,
         headers: config.headers,
         speechToken: config.speechToken,
+        // Speech sidecars are still cleartext HTTP in AO v1; mtls client unused here.
       );
     }
     if (!sessionOverlay) {
@@ -652,6 +671,25 @@ class SessionBridge {
   Future<void> dispose() async {
     await stop(clearRemote: true);
     await _statusController.close();
+  }
+
+  static WebSocketChannel _mtlsWsConnect(
+    Uri uri, {
+    required ReachMtlsMaterial material,
+    Iterable<String>? protocols,
+    Map<String, dynamic>? headers,
+    Duration? pingInterval,
+    Duration? connectTimeout,
+  }) {
+    final client = reachMtlsHttpClient(material);
+    return IOWebSocketChannel.connect(
+      uri,
+      protocols: protocols,
+      headers: headers,
+      pingInterval: pingInterval,
+      connectTimeout: connectTimeout,
+      customClient: client,
+    );
   }
 
   static WebSocketChannel _defaultWsConnect(

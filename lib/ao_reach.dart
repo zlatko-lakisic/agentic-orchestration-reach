@@ -11,6 +11,8 @@ export 'src/ids.dart';
 export 'src/local_mcp_host.dart';
 export 'src/mcp_bootstrap.dart';
 export 'src/mcp_session_spec.dart';
+export 'src/mtls.dart';
+export 'src/mtls_enroller.dart';
 export 'src/overlay_packer.dart';
 export 'src/session_bridge.dart';
 export 'src/speech_client.dart';

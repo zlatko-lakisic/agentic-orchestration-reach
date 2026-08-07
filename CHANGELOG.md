@@ -4,6 +4,13 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-07
+
+### Added
+
+- **mTLS** — `ReachMtlsConfig` on `ReachConnectionConfig` (PEMs or `materialDir` with `cert.pem` / `key.pem` / `ca.pem`). Session WebSocket uses a `SecurityContext` client cert against the AO engine (`https`/`wss` required).
+- **`ReachMtlsEnroller`** — one-time enroll against `POST /api/v1/mtls/enroll` with an AO mint-token; persists material for later connects. Requires `openssl` on PATH. Bootstrap trust via `caPem` or `trustEnrollmentCa: true` (TOFU).
+
 ## [0.3.0] - 2026-08-04
 
 ### Added
