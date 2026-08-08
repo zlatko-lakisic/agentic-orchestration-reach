@@ -162,21 +162,26 @@ class LocalMcpHost {
     Duration readyTimeout = const Duration(seconds: 90),
   }) async {
     final port = await _pickFreePort();
-    // Pin 5.0.x: newer mcp-proxy pulls yargs that requires Node ≥20; Pi is on 18.
-    // Do not insert a npx argv separator before innerArgs: npx treats "--" as its own
-    // separator and mcp-proxy never receives the stdio server command.
+    // mcp-proxy@5.12.x:
+    // - bind loopback explicitly (default host is "::", so 127.0.0.1 health fails)
+    // - use --shell + one argv for the stdio command: nested `npx -y …` as
+    //   positionals ends up feeding initialize JSON to `sh` ("method:initialize:
+    //   command not found"). Outer `npx` also swallows a bare `--` separator.
+    // - 5.12.x needs Node ≥20 (global crypto + modern regex).
     final args = <String>[
       '-y',
-      // 5.12.x needs Node ≥20 (global crypto + modern regex). 5.0.0 on Node 18
-      // falsely passed health checks then crashed on initialize/tools/list.
       'mcp-proxy@5.12.5',
+      '--host',
+      '127.0.0.1',
       '--port',
       '$port',
       '--server',
       'stream',
+      '--stateless',
       '--streamEndpoint',
       '/mcp',
-      ...innerArgs,
+      '--shell',
+      _shellJoin(innerArgs),
     ];
 
     final env = Map<String, String>.from(Platform.environment);
@@ -415,6 +420,19 @@ class LocalMcpHost {
   }
 
   Future<int> pickFreePort() => _pickFreePort();
+
+  /// Join argv for `mcp-proxy --shell` (single command string).
+  static String _shellJoin(List<String> argv) {
+    if (argv.isEmpty) return '';
+    return argv.map(_shellQuote).join(' ');
+  }
+
+  static String _shellQuote(String value) {
+    if (value.isEmpty) return "''";
+    // Safe unquoted token.
+    if (RegExp(r'^[A-Za-z0-9_./:@%+=,-]+$').hasMatch(value)) return value;
+    return "'${value.replaceAll("'", "'\\''")}'";
+  }
 
   Future<int> _pickFreePort() async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);

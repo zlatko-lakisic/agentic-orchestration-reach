@@ -1,12 +1,24 @@
-## 0.5.1
-
-- Restore `SessionBridge.refreshOverlay` + TTL auto-refresh (regressed in 0.5.0 cut from 0.4.0 without 0.4.1). Refresh re-sends required `appId`.
-
 # Changelog
 
 All notable changes to **agentic-orchestration-reach** (AO Reach) are documented here.
 
 ## [Unreleased]
+
+## [0.5.2] - 2026-08-08
+
+### Fixed
+
+- **LocalMcpHost / mcp-proxy spawn** — bind `--host 127.0.0.1`, enable `--stateless`,
+  and pass the stdio server via `--shell` as one command string. Nested
+  `npx -y <package>` as positionals was failing health/initialize with
+  `sh: method:initialize: command not found` (Gmail/Calendar and other npx MCPs).
+
+## [0.5.1] - 2026-08-08
+
+### Fixed
+
+- Restore `SessionBridge.refreshOverlay` + TTL auto-refresh (regressed in 0.5.0).
+  Refresh includes required `appId`.
 
 ## [0.5.0] - 2026-08-08
 
