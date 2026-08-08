@@ -28,7 +28,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.4.0
+      ref: v0.5.0
 ```
 
 ## Quick start
@@ -41,6 +41,7 @@ final bridge = SessionBridge();
 await bridge.start(
   config: ReachConnectionConfig(
     baseUrl: 'https://ao-host:8765',
+    appId: 'myapp', // required stable product id (e.g. knowbuddy, comstar)
     headers: {
       'x-agentic-session-id': 'sess-1',
     },
@@ -99,6 +100,7 @@ final material = await ReachMtlsEnroller().enroll(
 await bridge.start(
   config: ReachConnectionConfig(
     baseUrl: 'https://ao-host:8765',
+    appId: 'myapp',
     headers: const {},
     mtls: ReachMtlsConfig(materialDir: material.dir),
   ),
@@ -118,7 +120,7 @@ Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to
 | `LocalMcpHost` | Loopback `mcp-proxy` for stdio MCPs |
 | `OverlayPacker` | YAML → `client.*` agents + MCP entries |
 | `McpSessionSpec` | Declares stdio-tunnel vs hosted HTTP MCPs |
-| `ReachConnectionConfig` | Base URL, headers, TTL, speech, optional `mtls` |
+| `ReachConnectionConfig` | Base URL, required `appId`, headers, TTL, speech, optional `mtls` |
 | `ReachMtlsEnroller` | Token enroll → persist `cert.pem` / `key.pem` / `ca.pem` |
 
 ## Tests

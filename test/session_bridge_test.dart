@@ -139,6 +139,7 @@ void main() {
           'x-agentic-session-id': 's-test',
           'Accept': 'application/json',
         },
+        appId: 'testapp',
         enabled: enabled,
         ttlSeconds: 120,
         questionIdPrefix: 'test',
@@ -168,6 +169,7 @@ void main() {
       if (speech != null) 'speech': speech,
     });
     final reg = await server.waitForType('session_overlay_register');
+    expect(reg['appId'], 'testapp');
     expect(reg['ttlSeconds'], 120);
     expect(reg['agents'], isA<List>());
     server.push({

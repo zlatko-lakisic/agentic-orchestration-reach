@@ -301,6 +301,7 @@ class SessionBridge {
     _emit();
     _send({
       'type': 'session_overlay_register',
+      'appId': config.appId,
       'ttlSeconds': config.ttlSeconds,
       'agents': pack.agents,
       'mcps': pack.mcps,
@@ -314,8 +315,11 @@ class SessionBridge {
         '(engine may still be downloading models)',
       ),
     );
-    if (ack['type'] == 'error') {
-      throw StateError(ack['message']?.toString() ?? 'session_overlay_register failed');
+    if (ack['type'] == 'error' || ack['type'] == 'session_overlay_denied') {
+      throw StateError(
+        ack['message']?.toString() ??
+            'Reach registration denied (appId required)',
+      );
     }
     if (ack['type'] != 'session_overlay_ack') {
       throw StateError('Expected session_overlay_ack, got ${ack['type']}');
@@ -422,6 +426,12 @@ class SessionBridge {
       case 'session_overlay_ack':
         _ackWait?.complete(msg);
         _ackWait = null;
+        break;
+      case 'session_overlay_denied':
+        if (_ackWait != null && !(_ackWait!.isCompleted)) {
+          _ackWait!.complete(msg);
+          _ackWait = null;
+        }
         break;
       case 'session_overlay_cleared':
         _clearedWait?.complete(msg);

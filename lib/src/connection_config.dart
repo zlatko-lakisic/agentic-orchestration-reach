@@ -3,11 +3,38 @@ import 'dart:math';
 
 import 'mtls.dart';
 
+/// Stable product id pattern for Reach `appId` (e.g. `knowbuddy`, `comstar`).
+final RegExp reachAppIdPattern = RegExp(r'^[a-z][a-z0-9_-]{1,63}$');
+
+/// Normalize and validate a Reach [appId].
+///
+/// Throws [ArgumentError] when empty or not matching [reachAppIdPattern].
+String normalizeReachAppId(String raw) {
+  final appId = raw.trim().toLowerCase();
+  if (appId.isEmpty) {
+    throw ArgumentError.value(
+      raw,
+      'appId',
+      'ReachConnectionConfig.appId is required '
+          "(product apps must advertise a stable id such as 'knowbuddy' or 'comstar')",
+    );
+  }
+  if (!reachAppIdPattern.hasMatch(appId)) {
+    throw ArgumentError.value(
+      raw,
+      'appId',
+      'must match ${reachAppIdPattern.pattern}',
+    );
+  }
+  return appId;
+}
+
 /// Connection settings for AO Reach (product apps map their own settings here).
 class ReachConnectionConfig {
-  const ReachConnectionConfig({
+  ReachConnectionConfig({
     required this.baseUrl,
     required this.headers,
+    required String appId,
     this.enabled = true,
     this.ttlSeconds = 3600,
     this.questionIdPrefix = 'reach',
@@ -16,7 +43,7 @@ class ReachConnectionConfig {
     this.speechSttBaseUrlOverride,
     this.speechTtsBaseUrlOverride,
     this.mtls,
-  });
+  }) : appId = normalizeReachAppId(appId);
 
   /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
   ///
@@ -27,6 +54,10 @@ class ReachConnectionConfig {
   /// Headers for REST + WebSocket handshake (optional session id, etc.).
   /// Under mTLS, user identity comes from the client certificate.
   final Map<String, String> headers;
+
+  /// Stable product identity sent on every `session_overlay_register`
+  /// (e.g. `knowbuddy`, `comstar`). Required by AO ≥ 1.31.
+  final String appId;
 
   /// When false, [SessionBridge.start] is a no-op (idle).
   final bool enabled;
@@ -55,6 +86,7 @@ class ReachConnectionConfig {
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
+    String? appId,
     bool? enabled,
     int? ttlSeconds,
     String? questionIdPrefix,
@@ -67,6 +99,7 @@ class ReachConnectionConfig {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
       headers: headers ?? Map<String, String>.from(this.headers),
+      appId: appId ?? this.appId,
       enabled: enabled ?? this.enabled,
       ttlSeconds: ttlSeconds ?? this.ttlSeconds,
       questionIdPrefix: questionIdPrefix ?? this.questionIdPrefix,

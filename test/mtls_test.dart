@@ -42,6 +42,7 @@ void main() {
     final cfg = ReachConnectionConfig(
       baseUrl: 'https://ao:8765',
       headers: const {},
+      appId: 'testapp',
       mtls: const ReachMtlsConfig(materialDir: '/tmp/x'),
     );
     expect(cfg.mtls?.materialDir, '/tmp/x');

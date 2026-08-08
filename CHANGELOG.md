@@ -4,6 +4,15 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-08
+
+### Breaking
+
+- **`ReachConnectionConfig.appId` is required** — product apps must advertise a
+  stable id (e.g. `knowbuddy`, `comstar`) on every `session_overlay_register`.
+  AO denies registration with `session_overlay_denied` / `app_id_required` when
+  missing. Pattern: `^[a-z][a-z0-9_-]{1,63}$` (normalized to lowercase).
+
 ## [0.4.0] - 2026-08-07
 
 ### Added
