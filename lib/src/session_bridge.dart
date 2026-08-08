@@ -82,6 +82,8 @@ class SessionBridge {
   ReachConnectionConfig? _lastConfig;
   String? _lastOverlayRoot;
   SessionMcpBootstrap? _lastBootstrap;
+  List<Map<String, dynamic>> _lastExtraMcps = const [];
+  Timer? _overlayRefreshTimer;
 
   final _statusController = StreamController<SessionBridge>.broadcast();
   Stream<SessionBridge> get statusChanges => _statusController.stream;
@@ -290,6 +292,7 @@ class SessionBridge {
     activeTunnelBareIds = List.unmodifiable(boot.activeTunnelBareIds);
     clientMcpWarnings = List.unmodifiable(boot.warnings);
 
+    _lastExtraMcps = List<Map<String, dynamic>>.from(boot.mcps);
     final pack = await _packer.pack(
       overlayRoot: overlayRoot,
       extraMcps: boot.mcps,
@@ -350,6 +353,99 @@ class SessionBridge {
     registerProgress = null;
     state = SessionBridgeState.active;
     error = null;
+    _scheduleOverlayRefresh();
+    _emit();
+  }
+
+  void _scheduleOverlayRefresh() {
+    _overlayRefreshTimer?.cancel();
+    _overlayRefreshTimer = null;
+    final config = _lastConfig;
+    if (config == null || !sessionOverlay) return;
+    final ttl = config.ttlSeconds.clamp(30, 86400);
+    // Refresh at 75% of TTL so agents remain available overnight.
+    final latest = ttl > 60 ? ttl - 30 : (ttl / 2).floor().clamp(1, ttl);
+    final earliest = latest < 60 ? 1 : 60;
+    final waitSec = (ttl * 0.75).round().clamp(earliest, latest);
+    _overlayRefreshTimer = Timer(Duration(seconds: waitSec), () {
+      unawaited(_refreshOverlayOrReconnect());
+    });
+  }
+
+  Future<void> _refreshOverlayOrReconnect() async {
+    try {
+      await refreshOverlay();
+    } catch (e) {
+      final config = _lastConfig;
+      final overlayRoot = _lastOverlayRoot;
+      final boot = _lastBootstrap;
+      if (_stopping || config == null || overlayRoot == null || boot == null) {
+        return;
+      }
+      try {
+        await _cleanupLocal(clearRemote: false);
+        await _connectAndRegister(
+          config: config,
+          overlayRoot: overlayRoot,
+          mcpBootstrap: boot,
+        );
+      } catch (_) {
+        state = SessionBridgeState.disconnected;
+        error = 'overlay renew failed: $e';
+        _emit();
+      }
+    }
+  }
+
+  /// Re-pack and re-register overlay agents/MCPs/skills on the live socket.
+  Future<void> refreshOverlay() async {
+    final config = _lastConfig;
+    final overlayRoot = _lastOverlayRoot;
+    if (_stopping ||
+        !isActive ||
+        _channel == null ||
+        config == null ||
+        overlayRoot == null) {
+      throw StateError('Session bridge is not active — cannot refresh overlay');
+    }
+    final pack = await _packer.pack(
+      overlayRoot: overlayRoot,
+      extraMcps: _lastExtraMcps,
+    );
+    final ackWait = Completer<Map<String, dynamic>>();
+    _ackWait = ackWait;
+    _send({
+      'type': 'session_overlay_register',
+      'appId': config.appId,
+      'ttlSeconds': config.ttlSeconds,
+      'agents': pack.agents,
+      'mcps': pack.mcps,
+      'skills': pack.skills,
+    });
+    final ack = await ackWait.future.timeout(
+      const Duration(seconds: 60),
+      onTimeout: () =>
+          throw TimeoutException('Timed out refreshing session_overlay'),
+    );
+    if (ack['type'] == 'error' || ack['type'] == 'session_overlay_denied') {
+      throw StateError(
+        ack['message']?.toString() ?? 'session_overlay_register failed',
+      );
+    }
+    if (ack['type'] != 'session_overlay_ack') {
+      throw StateError('Expected session_overlay_ack, got ${ack['type']}');
+    }
+    registeredAgentIds =
+        ((ack['agentIds'] as List?) ?? pack.agentIds).map((e) => e.toString()).toList();
+    if (ack.containsKey('mcpIds')) {
+      registeredMcpIds =
+          ((ack['mcpIds'] as List?) ?? const []).map((e) => e.toString()).toList();
+    } else {
+      registeredMcpIds = List<String>.from(pack.mcpIds);
+    }
+    final exp = ack['expiresAt'];
+    expiresAt = exp is num ? exp.toDouble() : null;
+    _scheduleOverlayRefresh();
     _emit();
   }
 
@@ -642,6 +738,8 @@ class SessionBridge {
   }
 
   Future<void> _cleanupLocal({required bool clearRemote}) async {
+    _overlayRefreshTimer?.cancel();
+    _overlayRefreshTimer = null;
     for (final run in _pendingRuns.values) {
       if (!run.done.isCompleted) {
         run.done.completeError(StateError('session bridge closed'));

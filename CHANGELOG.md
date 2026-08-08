@@ -1,3 +1,7 @@
+## 0.5.1
+
+- Restore `SessionBridge.refreshOverlay` + TTL auto-refresh (regressed in 0.5.0 cut from 0.4.0 without 0.4.1). Refresh re-sends required `appId`.
+
 # Changelog
 
 All notable changes to **agentic-orchestration-reach** (AO Reach) are documented here.
