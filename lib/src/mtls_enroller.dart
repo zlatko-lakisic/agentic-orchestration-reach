@@ -78,7 +78,7 @@ class ReachMtlsEnroller {
           dir: outDir,
           clientCertPem: enrolled.certificatePem,
           clientKeyPem: keyPem,
-          caPem: enrolled.caPem.isNotEmpty ? enrolled.caPem : pinnedCa!,
+          caPem: enrolled.caPem.isNotEmpty ? enrolled.caPem : pinnedCa,
           subject: enrolled.subject,
           expiresAt: enrolled.expiresAt,
         );
@@ -101,7 +101,7 @@ class ReachMtlsEnroller {
     required String? caPem,
     required bool trustEnrollmentCa,
   }) async {
-    if (_httpClient != null) return _httpClient!;
+    if (_httpClient != null) return _httpClient;
     if (caPem != null && caPem.trim().isNotEmpty) {
       final ctx = SecurityContext(withTrustedRoots: false);
       ctx.setTrustedCertificatesBytes(utf8.encode(caPem));
