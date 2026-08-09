@@ -41,7 +41,7 @@ final bridge = SessionBridge();
 await bridge.start(
   config: ReachConnectionConfig(
     baseUrl: 'https://ao-host:8765',
-    appId: 'myapp', // required stable product id (e.g. knowbuddy, comstar)
+    appId: 'myapp', // required stable client appId
     headers: {
       'x-agentic-session-id': 'sess-1',
     },

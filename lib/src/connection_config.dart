@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'mtls.dart';
 
-/// Stable product id pattern for Reach `appId` (e.g. `knowbuddy`, `comstar`).
+/// Stable client id pattern for Reach `appId` (e.g. `myapp`, `field-client`).
 final RegExp reachAppIdPattern = RegExp(r'^[a-z][a-z0-9_-]{1,63}$');
 
 /// Normalize and validate a Reach [appId].
@@ -16,7 +16,7 @@ String normalizeReachAppId(String raw) {
       raw,
       'appId',
       'ReachConnectionConfig.appId is required '
-          "(product apps must advertise a stable id such as 'knowbuddy' or 'comstar')",
+          "(clients must advertise a stable id such as 'myapp' or 'field-client')",
     );
   }
   if (!reachAppIdPattern.hasMatch(appId)) {
@@ -56,7 +56,7 @@ class ReachConnectionConfig {
   final Map<String, String> headers;
 
   /// Stable product identity sent on every `session_overlay_register`
-  /// (e.g. `knowbuddy`, `comstar`). Required by AO ≥ 1.31.
+  /// (e.g. `myapp`, `field-client`). Required by AO ≥ 1.31.
   final String appId;
 
   /// When false, [SessionBridge.start] is a no-op (idle).

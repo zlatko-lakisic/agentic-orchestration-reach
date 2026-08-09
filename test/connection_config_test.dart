@@ -6,9 +6,9 @@ void main() {
     final cfg = ReachConnectionConfig(
       baseUrl: 'http://localhost:8765',
       headers: const {},
-      appId: 'KnowBuddy',
+      appId: 'MyApp',
     );
-    expect(cfg.appId, 'knowbuddy');
+    expect(cfg.appId, 'myapp');
   });
 
   test('empty appId is rejected', () {
