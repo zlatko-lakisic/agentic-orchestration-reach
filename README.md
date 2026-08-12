@@ -129,6 +129,19 @@ Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to
 dart test
 ```
 
+## Python client
+
+See [`python/`](python/) for the protocol-compatible Python `ao_reach` package (used by [HACS Comstar](https://github.com/zlatko-lakisic/hacs-comstar)).
+
+```bash
+cd python && pip install -e ".[dev]" && pytest
+```
+
 ## Versioning
 
 Semantic versioning. See `VERSION` + `CHANGELOG.md`. Git tags `vX.Y.Z` are the published artifacts apps should pin.
+
+## Python client
+
+See [python/](python/) for the protocol-compatible Python o_reach package (used by HACS Comstar).
+
