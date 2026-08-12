@@ -128,6 +128,7 @@ class SessionBridge {
       'text': text,
       'context': context,
       'questionId': qid,
+      if (_lastConfig != null) 'appId': _lastConfig!.appId,
       if (responseFormat != null) 'responseFormat': responseFormat,
       if (jsonSchema != null) 'jsonSchema': jsonSchema,
       if (mcpProviderIds != null && mcpProviderIds.isNotEmpty) 'mcpProviderIds': mcpProviderIds,
@@ -139,6 +140,73 @@ class SessionBridge {
       throw TimeoutException('direct_agent timed out for $agentProviderId ($qid)');
     }
   }
+
+  /// Run AO dynamic planning (`type: chat`) on the owning session WebSocket.
+  ///
+  /// [runMode] defaults to [ReachConnectionConfig.defaultRunMode] when omitted
+  /// (`dynamic` or `dynamic-iterative`). Engine in-process chat is single-shot;
+  /// iterative is honored as a hint / for AO HTTP parity.
+  Future<Map<String, dynamic>> chat({
+    required String text,
+    String? questionId,
+    List<String>? selectedAgentProviderIds,
+    String? runMode,
+    String? sessionId,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    if (!isActive || _channel == null) {
+      throw StateError('Session bridge is not active — cannot run dynamic chat');
+    }
+    final cfg = _lastConfig;
+    final prefix = cfg?.questionIdPrefix ?? 'reach';
+    final qid = (questionId != null && questionId.trim().isNotEmpty)
+        ? questionId.trim()
+        : '$prefix-${DateTime.now().microsecondsSinceEpoch}';
+    if (_pendingRuns.containsKey(qid)) {
+      throw StateError('chat already in flight for questionId=$qid');
+    }
+    final mode = (runMode != null && runMode.trim().isNotEmpty)
+        ? runMode.trim()
+        : (cfg?.defaultRunMode.trim().isNotEmpty == true
+            ? cfg!.defaultRunMode.trim()
+            : 'dynamic');
+    final pending = _PendingDirectRun(questionId: qid);
+    _pendingRuns[qid] = pending;
+    _send({
+      'type': 'chat',
+      'text': text,
+      'questionId': qid,
+      'runMode': mode,
+      if (cfg != null) 'appId': cfg.appId,
+      if (sessionId != null && sessionId.trim().isNotEmpty) 'sessionId': sessionId.trim(),
+      if (selectedAgentProviderIds != null && selectedAgentProviderIds.isNotEmpty)
+        'selectedAgentProviderIds': selectedAgentProviderIds,
+    });
+    try {
+      return await pending.done.future.timeout(timeout);
+    } on TimeoutException {
+      _pendingRuns.remove(qid);
+      throw TimeoutException('chat timed out ($qid)');
+    }
+  }
+
+  /// Alias for [chat] (plan + ephemeral crew).
+  Future<Map<String, dynamic>> runDynamic({
+    required String text,
+    String? questionId,
+    List<String>? selectedAgentProviderIds,
+    String? runMode,
+    String? sessionId,
+    Duration timeout = const Duration(minutes: 10),
+  }) =>
+      chat(
+        text: text,
+        questionId: questionId,
+        selectedAgentProviderIds: selectedAgentProviderIds,
+        runMode: runMode,
+        sessionId: sessionId,
+        timeout: timeout,
+      );
 
   void _emit() {
     if (!_statusController.isClosed) _statusController.add(this);

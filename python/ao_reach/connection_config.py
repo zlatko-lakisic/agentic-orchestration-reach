@@ -40,11 +40,15 @@ class ReachConnectionConfig:
     speech_stt_base_url_override: str | None = None
     speech_tts_base_url_override: str | None = None
     mtls: ReachMtlsConfig | None = None
+    dynamic_planning: bool = False
+    default_run_mode: str = "dynamic"
 
     def __post_init__(self) -> None:
         self.app_id = normalize_reach_app_id(self.app_id)
         self.base_url = self.base_url.rstrip("/")
         self.headers = dict(self.headers)
+        mode = (self.default_run_mode or "dynamic").strip().lower()
+        self.default_run_mode = mode if mode in ("dynamic", "dynamic-iterative") else "dynamic"
 
     def copy_with(self, **kwargs: object) -> ReachConnectionConfig:
         return replace(self, **kwargs)  # type: ignore[arg-type]

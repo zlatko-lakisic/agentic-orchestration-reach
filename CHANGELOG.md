@@ -4,6 +4,13 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-12
+
+### Added
+
+- **`SessionBridge.chat` / `runDynamic`** — AO engine dynamic planning (`type: chat`) with per-call `runMode`, `selectedAgentProviderIds`, and `appId`.
+- **`ReachConnectionConfig.dynamicPlanning` / `defaultRunMode`** — sticky defaults for dynamic chat (AO Admin can also set per-`appId` prefs on matching AO builds).
+
 ## [0.5.2] - 2026-08-08
 
 ### Fixed

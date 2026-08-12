@@ -317,6 +317,7 @@ void main() {
     final msg = await server.waitForType('direct_agent');
     expect(msg['agentProviderId'], 'client.demo_agent');
     expect(msg['questionId'], 'q-1');
+    expect(msg['appId'], 'testapp');
     expect(msg['mcpProviderIds'], ['client.filesystem_local']);
     server.push({
       'type': 'chunk',
@@ -340,6 +341,37 @@ void main() {
     expect(result['ok'], isTrue);
     expect(result['text'], 'Hello');
     expect(result['questionId'], 'q-1');
+  });
+
+  test('chat sends dynamic planning payload', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'plan irrigation',
+      questionId: 'q-chat',
+      runMode: 'dynamic',
+      selectedAgentProviderIds: const ['client.demo_agent'],
+    );
+    final msg = await server.waitForType('chat');
+    expect(msg['text'], 'plan irrigation');
+    expect(msg['questionId'], 'q-chat');
+    expect(msg['runMode'], 'dynamic');
+    expect(msg['appId'], 'testapp');
+    expect(msg['selectedAgentProviderIds'], ['client.demo_agent']);
+    server.push({
+      'type': 'chunk',
+      'questionId': 'q-chat',
+      'stream': 'stdout',
+      'text': 'done',
+    });
+    server.push({
+      'type': 'run_end',
+      'questionId': 'q-chat',
+      'ok': true,
+      'elapsedMs': 5,
+    });
+    final result = await run;
+    expect(result['ok'], isTrue);
+    expect(result['text'], 'done');
   });
 
   test('directAgent fails on run_end ok=false', () async {

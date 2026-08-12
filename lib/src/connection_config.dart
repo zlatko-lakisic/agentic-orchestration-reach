@@ -43,6 +43,8 @@ class ReachConnectionConfig {
     this.speechSttBaseUrlOverride,
     this.speechTtsBaseUrlOverride,
     this.mtls,
+    this.dynamicPlanning = false,
+    this.defaultRunMode = 'dynamic',
   }) : appId = normalizeReachAppId(appId);
 
   /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
@@ -83,6 +85,14 @@ class ReachConnectionConfig {
   /// Mutual TLS material for the engine WebSocket (and speech HTTP when set).
   final ReachMtlsConfig? mtls;
 
+  /// When true, [SessionBridge.chat] is the preferred path for this app
+  /// (sticky default). Per-call [SessionBridge.chat] always works regardless.
+  final bool dynamicPlanning;
+
+  /// Default `runMode` for [SessionBridge.chat] when the caller omits one
+  /// (`dynamic` or `dynamic-iterative`).
+  final String defaultRunMode;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -95,6 +105,8 @@ class ReachConnectionConfig {
     String? speechSttBaseUrlOverride,
     String? speechTtsBaseUrlOverride,
     ReachMtlsConfig? mtls,
+    bool? dynamicPlanning,
+    String? defaultRunMode,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -110,6 +122,8 @@ class ReachConnectionConfig {
       speechTtsBaseUrlOverride:
           speechTtsBaseUrlOverride ?? this.speechTtsBaseUrlOverride,
       mtls: mtls ?? this.mtls,
+      dynamicPlanning: dynamicPlanning ?? this.dynamicPlanning,
+      defaultRunMode: defaultRunMode ?? this.defaultRunMode,
     );
   }
 }

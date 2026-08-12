@@ -293,6 +293,8 @@ class SessionBridge:
             "context": context,
             "questionId": qid,
         }
+        if self._last_config is not None:
+            payload["appId"] = self._last_config.app_id
         if mcp_provider_ids:
             payload["mcpProviderIds"] = mcp_provider_ids
         await self._send(payload)
@@ -301,6 +303,67 @@ class SessionBridge:
         except TimeoutError:
             self._pending_runs.pop(qid, None)
             raise TimeoutError(f"direct_agent timed out for {agent_provider_id} ({qid})") from None
+
+    async def chat(
+        self,
+        *,
+        text: str,
+        question_id: str | None = None,
+        selected_agent_provider_ids: list[str] | None = None,
+        run_mode: str | None = None,
+        session_id: str | None = None,
+        timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """Run AO dynamic planning (`type: chat`) on the owning session WebSocket."""
+        if not self.is_active or self._ws is None:
+            raise RuntimeError("Session bridge is not active — cannot run dynamic chat")
+        cfg = self._last_config
+        prefix = cfg.question_id_prefix if cfg else "reach"
+        qid = (question_id or "").strip() or f"{prefix}-{int(time.time() * 1_000_000)}"
+        if qid in self._pending_runs:
+            raise RuntimeError(f"chat already in flight for questionId={qid}")
+        mode = (run_mode or "").strip() or (cfg.default_run_mode if cfg else "dynamic")
+        loop = asyncio.get_event_loop()
+        pending = _PendingDirectRun(question_id=qid, done=loop.create_future())
+        self._pending_runs[qid] = pending
+        payload: dict[str, Any] = {
+            "type": "chat",
+            "text": text,
+            "questionId": qid,
+            "runMode": mode,
+        }
+        if cfg is not None:
+            payload["appId"] = cfg.app_id
+        if session_id and str(session_id).strip():
+            payload["sessionId"] = str(session_id).strip()
+        if selected_agent_provider_ids:
+            payload["selectedAgentProviderIds"] = list(selected_agent_provider_ids)
+        await self._send(payload)
+        try:
+            return await asyncio.wait_for(pending.done, timeout=timeout)
+        except TimeoutError:
+            self._pending_runs.pop(qid, None)
+            raise TimeoutError(f"chat timed out ({qid})") from None
+
+    async def run_dynamic(
+        self,
+        *,
+        text: str,
+        question_id: str | None = None,
+        selected_agent_provider_ids: list[str] | None = None,
+        run_mode: str | None = None,
+        session_id: str | None = None,
+        timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """Alias for [chat] (plan + ephemeral crew)."""
+        return await self.chat(
+            text=text,
+            question_id=question_id,
+            selected_agent_provider_ids=selected_agent_provider_ids,
+            run_mode=run_mode,
+            session_id=session_id,
+            timeout=timeout,
+        )
 
     async def _read_loop(self) -> None:
         assert self._ws is not None

@@ -28,7 +28,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.5.0
+      ref: v0.6.0
 ```
 
 ## Quick start
@@ -57,8 +57,17 @@ final result = await bridge.directAgent(
   mcpProviderIds: ['client.filesystem_local'],
 );
 
+// Dynamic planning (AO engine `type: chat`) — per-call runMode
+final planned = await bridge.chat(
+  text: 'Plan irrigation for zone A',
+  runMode: 'dynamic', // or omit to use ReachConnectionConfig.defaultRunMode
+  selectedAgentProviderIds: ['client.my_agent'],
+);
+
 await bridge.stop();
 ```
+
+Set `dynamicPlanning: true` / `defaultRunMode` on `ReachConnectionConfig` for sticky app defaults (AO Admin **Access → Dynamic planning by app** can also set sticky prefs for the same `appId`).
 
 ### Speech (optional, AO ≥ 1.28)
 
@@ -115,12 +124,12 @@ Implement `SessionMcpBootstrap` in the product app to decide which local MCPs to
 
 | Module | Role |
 |--------|------|
-| `SessionBridge` | WS lifecycle, overlay register/clear, tunnel responder, `direct_agent`, speech discovery |
+| `SessionBridge` | WS lifecycle, overlay register/clear, tunnel responder, `direct_agent`, `chat` / `runDynamic`, speech discovery |
 | `SpeechClient` | OpenAI-compatible STT/TTS HTTP; `transcribe` / `transcribeDetailed` / `synthesize` |
 | `LocalMcpHost` | Loopback `mcp-proxy` for stdio MCPs |
 | `OverlayPacker` | YAML → `client.*` agents + MCP entries |
 | `McpSessionSpec` | Declares stdio-tunnel vs hosted HTTP MCPs |
-| `ReachConnectionConfig` | Base URL, required `appId`, headers, TTL, speech, optional `mtls` |
+| `ReachConnectionConfig` | Base URL, required `appId`, headers, TTL, `dynamicPlanning` / `defaultRunMode`, speech, optional `mtls` |
 | `ReachMtlsEnroller` | Token enroll → persist `cert.pem` / `key.pem` / `ca.pem` |
 
 ## Tests
