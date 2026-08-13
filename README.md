@@ -62,7 +62,12 @@ final planned = await bridge.chat(
   text: 'Plan irrigation for zone A',
   runMode: 'dynamic', // or omit to use ReachConnectionConfig.defaultRunMode
   selectedAgentProviderIds: ['client.my_agent'],
+  onStatus: (s) {
+    // Stream s.message to the user; s.processing / s.phase for UI state.
+    setState(() => statusLine = s.message);
+  },
 );
+// On failure: catch ReachRunException (code, message) and decide recovery.
 
 await bridge.stop();
 ```

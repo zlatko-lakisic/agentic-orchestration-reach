@@ -20,6 +20,7 @@ from .local_mcp_host import LocalMcpHost
 from .mcp_bootstrap import EmptySessionMcpBootstrap, SessionMcpBootstrap
 from .mtls import ReachMtlsConfig, assert_reach_mtls_uses_tls, load_reach_mtls_material
 from .overlay_packer import OverlayPacker
+from .run_status import ReachRunError, ReachRunStatus
 from .speech_client import SpeechCapabilities, SpeechClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +39,9 @@ class _PendingDirectRun:
     question_id: str
     stdout: list[str] = field(default_factory=list)
     last_error: str | None = None
+    last_error_code: str | None = None
+    last_status: Any = None
+    on_status: Callable[[Any], None] | None = None
     done: asyncio.Future = field(default_factory=lambda: asyncio.get_event_loop().create_future())
 
 
@@ -77,6 +81,7 @@ class SessionBridge:
         self._last_overlay_root: str | None = None
         self._last_bootstrap: SessionMcpBootstrap = EmptySessionMcpBootstrap()
         self._status_callbacks: list[Callable[[SessionBridge], None]] = []
+        self._run_status_callbacks: list[Callable[[ReachRunStatus], None]] = []
 
     @property
     def is_active(self) -> bool:
@@ -93,12 +98,30 @@ class SessionBridge:
     def on_status(self, callback: Callable[[SessionBridge], None]) -> None:
         self._status_callbacks.append(callback)
 
+    def on_run_status(self, callback: Callable[[ReachRunStatus], None]) -> None:
+        """Listen for all chat / direct_agent status frames (demux via question_id)."""
+        self._run_status_callbacks.append(callback)
+
     def _emit(self) -> None:
         for cb in list(self._status_callbacks):
             try:
                 cb(self)
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("status callback failed")
+
+    def _emit_run_status(self, status: ReachRunStatus, run: _PendingDirectRun | None) -> None:
+        if run is not None:
+            run.last_status = status
+            if run.on_status:
+                try:
+                    run.on_status(status)
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("run status callback failed")
+        for cb in list(self._run_status_callbacks):
+            try:
+                cb(status)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("run status listener failed")
 
     async def start(
         self,
@@ -290,6 +313,7 @@ class SessionBridge:
         context: str = "",
         question_id: str | None = None,
         mcp_provider_ids: list[str] | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 300.0,
     ) -> dict[str, Any]:
         if not self.is_active or self._ws is None:
@@ -299,7 +323,9 @@ class SessionBridge:
         if qid in self._pending_runs:
             raise RuntimeError(f"direct_agent already in flight for questionId={qid}")
         loop = asyncio.get_event_loop()
-        pending = _PendingDirectRun(question_id=qid, done=loop.create_future())
+        pending = _PendingDirectRun(
+            question_id=qid, done=loop.create_future(), on_status=on_status
+        )
         self._pending_runs[qid] = pending
         payload: dict[str, Any] = {
             "type": "direct_agent",
@@ -327,6 +353,7 @@ class SessionBridge:
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
         """Run AO dynamic planning (`type: chat`) on the owning session WebSocket."""
@@ -339,7 +366,9 @@ class SessionBridge:
             raise RuntimeError(f"chat already in flight for questionId={qid}")
         mode = (run_mode or "").strip() or (cfg.default_run_mode if cfg else "dynamic")
         loop = asyncio.get_event_loop()
-        pending = _PendingDirectRun(question_id=qid, done=loop.create_future())
+        pending = _PendingDirectRun(
+            question_id=qid, done=loop.create_future(), on_status=on_status
+        )
         self._pending_runs[qid] = pending
         payload: dict[str, Any] = {
             "type": "chat",
@@ -368,6 +397,7 @@ class SessionBridge:
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
+        on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
         """Alias for [chat] (plan + ephemeral crew)."""
@@ -377,6 +407,7 @@ class SessionBridge:
             selected_agent_provider_ids=selected_agent_provider_ids,
             run_mode=run_mode,
             session_id=session_id,
+            on_status=on_status,
             timeout=timeout,
         )
 
@@ -424,6 +455,10 @@ class SessionBridge:
                     self.register_progress = re.sub(r"^\(engine\)\s*", "", text)
                     self._emit()
             self._on_run_chunk(msg)
+        elif typ == "status":
+            self._on_run_status(msg)
+        elif typ == "run_start":
+            self._on_run_start(msg)
         elif typ == "run_end":
             self._on_run_end(msg)
         elif typ == "error":
@@ -437,6 +472,30 @@ class SessionBridge:
                 self._on_run_error(msg)
         elif typ == "mcp_tunnel_request":
             asyncio.create_task(self._handle_tunnel_request(msg))
+
+    def _on_run_start(self, msg: dict[str, Any]) -> None:
+        qid = msg.get("question_id") or msg.get("questionId")
+        if not qid:
+            return
+        run = self._pending_runs.get(str(qid))
+        if not run:
+            return
+        self._emit_run_status(
+            ReachRunStatus(
+                processing=True,
+                phase="starting",
+                message="Starting your request…",
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
+            ),
+            run,
+        )
+
+    def _on_run_status(self, msg: dict[str, Any]) -> None:
+        status = ReachRunStatus.from_json(msg)
+        run = self._pending_runs.get(status.question_id) if status.question_id else None
+        self._emit_run_status(status, run)
 
     def _on_run_chunk(self, msg: dict[str, Any]) -> None:
         qid = msg.get("question_id") or msg.get("questionId")
@@ -453,8 +512,19 @@ class SessionBridge:
         if not qid:
             return
         run = self._pending_runs.get(str(qid))
-        if run:
-            run.last_error = str(msg.get("message") or "AO error")
+        if not run:
+            return
+        status = ReachRunStatus.from_json(
+            {
+                **msg,
+                "processing": False,
+                "phase": msg.get("phase") or "error",
+                "message": msg.get("message") or "AO error",
+            }
+        )
+        run.last_error = status.message
+        run.last_error_code = status.code
+        self._emit_run_status(status, run)
 
     def _on_run_end(self, msg: dict[str, Any]) -> None:
         qid = msg.get("question_id") or msg.get("questionId")
@@ -467,11 +537,31 @@ class SessionBridge:
         fallback = str(msg.get("text") or "")
         ok = msg.get("ok") is True
         err = msg.get("error") or run.last_error
+        code = msg.get("code") or run.last_error_code
         if not ok:
-            run.done.set_exception(
-                RuntimeError(err if err else "direct_agent failed (run_end ok=false)")
+            status = ReachRunStatus(
+                processing=False,
+                phase="error",
+                message=str(err) if err else "Request failed",
+                code=str(code) if code else None,
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
             )
+            self._emit_run_status(status, run)
+            run.done.set_exception(ReachRunError.from_status(status))
             return
+        self._emit_run_status(
+            ReachRunStatus(
+                processing=False,
+                phase="done",
+                message="Done.",
+                question_id=str(qid),
+                run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),
+                raw=msg,
+            ),
+            run,
+        )
         run.done.set_result(
             {
                 "ok": True,

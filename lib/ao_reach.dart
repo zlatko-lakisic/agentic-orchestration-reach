@@ -15,5 +15,6 @@ export 'src/mcp_session_spec.dart';
 export 'src/mtls.dart';
 export 'src/mtls_enroller.dart';
 export 'src/overlay_packer.dart';
+export 'src/run_status.dart';
 export 'src/session_bridge.dart';
 export 'src/speech_client.dart';

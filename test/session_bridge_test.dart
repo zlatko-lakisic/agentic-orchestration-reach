@@ -388,7 +388,7 @@ void main() {
       'ok': false,
       'error': 'boom',
     });
-    await expectLater(run, throwsA(isA<StateError>()));
+    await expectLater(run, throwsA(isA<ReachRunException>()));
   });
 
   test('mcp_tunnel_request unknown path → 404 or 503', () async {

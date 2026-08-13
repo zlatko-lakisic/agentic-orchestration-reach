@@ -11,6 +11,7 @@ import 'local_mcp_host.dart';
 import 'mcp_bootstrap.dart';
 import 'mtls.dart';
 import 'overlay_packer.dart';
+import 'run_status.dart';
 import 'speech_client.dart';
 
 enum SessionBridgeState {
@@ -88,6 +89,11 @@ class SessionBridge {
   final _statusController = StreamController<SessionBridge>.broadcast();
   Stream<SessionBridge> get statusChanges => _statusController.stream;
 
+  final _runStatusController = StreamController<ReachRunStatus>.broadcast();
+
+  /// All in-flight chat / directAgent status frames (demux with [ReachRunStatus.questionId]).
+  Stream<ReachRunStatus> get runStatusUpdates => _runStatusController.stream;
+
   bool get isActive => state == SessionBridgeState.active;
   String? get filesystemMcpId => filesystemMcpActive ? clientFilesystemMcpId : null;
   String? get emailGmailMcpId => emailGmailMcpActive ? clientEmailGmailMcpId : null;
@@ -100,6 +106,9 @@ class SessionBridge {
   SpeechClient? get speechClient => _speechClient;
 
   /// Run `direct_agent` on the owning session WebSocket.
+  ///
+  /// Pass [onStatus] to stream user-friendly progress (`message`) while AO works.
+  /// Failures throw [ReachRunException] with [ReachRunException.code] when AO sends one.
   Future<Map<String, dynamic>> directAgent({
     required String agentProviderId,
     required String text,
@@ -108,6 +117,7 @@ class SessionBridge {
     Map<String, dynamic>? responseFormat,
     Map<String, dynamic>? jsonSchema,
     List<String>? mcpProviderIds,
+    void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 5),
   }) async {
     if (!isActive || _channel == null) {
@@ -120,7 +130,7 @@ class SessionBridge {
     if (_pendingRuns.containsKey(qid)) {
       throw StateError('direct_agent already in flight for questionId=$qid');
     }
-    final pending = _PendingDirectRun(questionId: qid);
+    final pending = _PendingDirectRun(questionId: qid, onStatus: onStatus);
     _pendingRuns[qid] = pending;
     _send({
       'type': 'direct_agent',
@@ -146,12 +156,15 @@ class SessionBridge {
   /// [runMode] defaults to [ReachConnectionConfig.defaultRunMode] when omitted
   /// (`dynamic` or `dynamic-iterative`). Engine in-process chat is single-shot;
   /// iterative is honored as a hint / for AO HTTP parity.
+  ///
+  /// [onStatus] receives processing/phase/`message` updates suitable for live UI text.
   Future<Map<String, dynamic>> chat({
     required String text,
     String? questionId,
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
+    void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 10),
   }) async {
     if (!isActive || _channel == null) {
@@ -170,7 +183,7 @@ class SessionBridge {
         : (cfg?.defaultRunMode.trim().isNotEmpty == true
             ? cfg!.defaultRunMode.trim()
             : 'dynamic');
-    final pending = _PendingDirectRun(questionId: qid);
+    final pending = _PendingDirectRun(questionId: qid, onStatus: onStatus);
     _pendingRuns[qid] = pending;
     _send({
       'type': 'chat',
@@ -197,6 +210,7 @@ class SessionBridge {
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
+    void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 10),
   }) =>
       chat(
@@ -205,6 +219,7 @@ class SessionBridge {
         selectedAgentProviderIds: selectedAgentProviderIds,
         runMode: runMode,
         sessionId: sessionId,
+        onStatus: onStatus,
         timeout: timeout,
       );
 
@@ -631,6 +646,12 @@ class SessionBridge {
         }
         _onRunChunk(msg);
         break;
+      case 'status':
+        _onRunStatus(msg);
+        break;
+      case 'run_start':
+        _onRunStart(msg);
+        break;
       case 'run_end':
         _onRunEnd(msg);
         break;
@@ -650,11 +671,48 @@ class SessionBridge {
         break;
       case 'pong':
       case 'preflight':
-      case 'run_start':
         break;
       default:
         break;
     }
+  }
+
+  void _emitRunStatus(ReachRunStatus status, _PendingDirectRun? run) {
+    run?.lastStatus = status;
+    run?.onStatus?.call(status);
+    if (!_runStatusController.isClosed) {
+      _runStatusController.add(status);
+    }
+  }
+
+  void _onRunStart(Map<String, dynamic> msg) {
+    final qid = msg['question_id']?.toString() ?? msg['questionId']?.toString();
+    if (qid == null) return;
+    final run = _pendingRuns[qid];
+    if (run == null) return;
+    _emitRunStatus(
+      ReachRunStatus(
+        processing: true,
+        phase: 'starting',
+        message: 'Starting your request…',
+        questionId: qid,
+        runId: msg['run_id']?.toString() ?? msg['runId']?.toString(),
+        raw: msg,
+      ),
+      run,
+    );
+  }
+
+  void _onRunStatus(Map<String, dynamic> msg) {
+    final status = ReachRunStatus.fromJson(msg);
+    final qid = status.questionId;
+    final run = qid != null ? _pendingRuns[qid] : null;
+    if (run == null && qid != null) {
+      // Still broadcast for global listeners.
+      if (!_runStatusController.isClosed) _runStatusController.add(status);
+      return;
+    }
+    _emitRunStatus(status, run);
   }
 
   void _onRunChunk(Map<String, dynamic> msg) {
@@ -672,7 +730,15 @@ class SessionBridge {
     if (qid == null) return;
     final run = _pendingRuns[qid];
     if (run == null) return;
-    run.lastError = msg['message']?.toString() ?? 'AO error';
+    final status = ReachRunStatus.fromJson({
+      ...msg,
+      'processing': false,
+      'phase': msg['phase'] ?? 'error',
+      'message': msg['message'] ?? 'AO error',
+    });
+    run.lastError = status.message;
+    run.lastErrorCode = status.code;
+    _emitRunStatus(status, run);
   }
 
   void _onRunEnd(Map<String, dynamic> msg) {
@@ -684,12 +750,32 @@ class SessionBridge {
     final fallback = msg['text']?.toString() ?? '';
     final ok = msg['ok'] == true;
     final err = msg['error']?.toString() ?? run.lastError;
+    final code = msg['code']?.toString() ?? run.lastErrorCode;
     if (!ok) {
-      run.done.completeError(
-        StateError(err?.isNotEmpty == true ? err! : 'direct_agent failed (run_end ok=false)'),
+      final status = ReachRunStatus(
+        processing: false,
+        phase: 'error',
+        message: (err != null && err.isNotEmpty) ? err : 'Request failed',
+        code: code,
+        questionId: qid,
+        runId: msg['run_id']?.toString() ?? msg['runId']?.toString(),
+        raw: msg,
       );
+      _emitRunStatus(status, run);
+      run.done.completeError(ReachRunException.fromStatus(status));
       return;
     }
+    _emitRunStatus(
+      ReachRunStatus(
+        processing: false,
+        phase: 'done',
+        message: 'Done.',
+        questionId: qid,
+        runId: msg['run_id']?.toString() ?? msg['runId']?.toString(),
+        raw: msg,
+      ),
+      run,
+    );
     run.done.complete({
       'ok': true,
       'text': text.isNotEmpty ? text : fallback,
@@ -867,6 +953,7 @@ class SessionBridge {
   Future<void> dispose() async {
     await stop(clearRemote: true);
     await _statusController.close();
+    await _runStatusController.close();
   }
 
   static WebSocketChannel _mtlsWsConnect(
@@ -906,10 +993,13 @@ class SessionBridge {
 }
 
 class _PendingDirectRun {
-  _PendingDirectRun({required this.questionId});
+  _PendingDirectRun({required this.questionId, this.onStatus});
 
   final String questionId;
+  final void Function(ReachRunStatus status)? onStatus;
   final StringBuffer stdout = StringBuffer();
   final Completer<Map<String, dynamic>> done = Completer<Map<String, dynamic>>();
   String? lastError;
+  String? lastErrorCode;
+  ReachRunStatus? lastStatus;
 }
