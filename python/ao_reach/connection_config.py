@@ -42,6 +42,8 @@ class ReachConnectionConfig:
     mtls: ReachMtlsConfig | None = None
     dynamic_planning: bool = False
     default_run_mode: str = "dynamic"
+    session_env: dict[str, str] | None = None
+    allowed_agent_provider_ids: list[str] | None = None
 
     def __post_init__(self) -> None:
         self.app_id = normalize_reach_app_id(self.app_id)
@@ -49,6 +51,12 @@ class ReachConnectionConfig:
         self.headers = dict(self.headers)
         mode = (self.default_run_mode or "dynamic").strip().lower()
         self.default_run_mode = mode if mode in ("dynamic", "dynamic-iterative") else "dynamic"
+        if self.session_env is not None:
+            self.session_env = {str(k): str(v) for k, v in dict(self.session_env).items() if str(k).strip()}
+        if self.allowed_agent_provider_ids is not None:
+            self.allowed_agent_provider_ids = [
+                str(x).strip() for x in self.allowed_agent_provider_ids if str(x).strip()
+            ]
 
     def copy_with(self, **kwargs: object) -> ReachConnectionConfig:
         return replace(self, **kwargs)  # type: ignore[arg-type]

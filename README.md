@@ -69,6 +69,20 @@ await bridge.stop();
 
 Set `dynamicPlanning: true` / `defaultRunMode` on `ReachConnectionConfig` for sticky app defaults (AO Admin **Access → Dynamic planning by app** can also set sticky prefs for the same `appId`).
 
+Pass per-client keys and stock agent allowlists on the same config:
+
+```dart
+ReachConnectionConfig(
+  baseUrl: 'https://ao-host:8765',
+  appId: 'comstar-ha',
+  headers: const {},
+  sessionEnv: {
+    'OPENAI_API_KEY': Platform.environment['OPENAI_API_KEY']!,
+  },
+  allowedAgentProviderIds: const ['gpt_research'], // not for home-assistant
+);
+```
+
 ### Speech (optional, AO ≥ 1.28)
 
 When the engine advertises `speech` on `hello`:

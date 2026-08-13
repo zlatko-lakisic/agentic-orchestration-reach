@@ -200,16 +200,19 @@ class SessionBridge:
 
         pack = self._packer.pack(overlay_root, extra_mcps=boot.mcps)
         self._ack_wait = asyncio.get_event_loop().create_future()
-        await self._send(
-            {
-                "type": "session_overlay_register",
-                "appId": config.app_id,
-                "ttlSeconds": config.ttl_seconds,
-                "agents": pack.agents,
-                "mcps": pack.mcps,
-                "skills": pack.skills,
-            }
-        )
+        payload: dict[str, Any] = {
+            "type": "session_overlay_register",
+            "appId": config.app_id,
+            "ttlSeconds": config.ttl_seconds,
+            "agents": pack.agents,
+            "mcps": pack.mcps,
+            "skills": pack.skills,
+        }
+        if config.session_env:
+            payload["env"] = dict(config.session_env)
+        if config.allowed_agent_provider_ids:
+            payload["allowedAgentProviderIds"] = list(config.allowed_agent_provider_ids)
+        await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
         if ack.get("type") == "session_overlay_denied" or ack.get("type") == "error":
@@ -247,16 +250,20 @@ class SessionBridge:
         )
         pack = self._packer.pack(self._last_overlay_root, extra_mcps=boot.mcps)
         self._ack_wait = asyncio.get_event_loop().create_future()
-        await self._send(
-            {
-                "type": "session_overlay_register",
-                "appId": self._last_config.app_id,
-                "ttlSeconds": self._last_config.ttl_seconds,
-                "agents": pack.agents,
-                "mcps": pack.mcps,
-                "skills": pack.skills,
-            }
-        )
+        cfg = self._last_config
+        payload: dict[str, Any] = {
+            "type": "session_overlay_register",
+            "appId": cfg.app_id,
+            "ttlSeconds": cfg.ttl_seconds,
+            "agents": pack.agents,
+            "mcps": pack.mcps,
+            "skills": pack.skills,
+        }
+        if cfg.session_env:
+            payload["env"] = dict(cfg.session_env)
+        if cfg.allowed_agent_provider_ids:
+            payload["allowedAgentProviderIds"] = list(cfg.allowed_agent_provider_ids)
+        await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
         if ack.get("type") in ("session_overlay_denied", "error"):

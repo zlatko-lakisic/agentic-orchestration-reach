@@ -45,6 +45,8 @@ class ReachConnectionConfig {
     this.mtls,
     this.dynamicPlanning = false,
     this.defaultRunMode = 'dynamic',
+    this.sessionEnv,
+    this.allowedAgentProviderIds,
   }) : appId = normalizeReachAppId(appId);
 
   /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
@@ -93,6 +95,13 @@ class ReachConnectionConfig {
   /// (`dynamic` or `dynamic-iterative`).
   final String defaultRunMode;
 
+  /// Provider secrets / base URLs sent on `session_overlay_register` (`env`).
+  /// Allowed keys: OPENAI_API_KEY, ANTHROPIC_API_KEY, HF_TOKEN, base URLs, …
+  final Map<String, String>? sessionEnv;
+
+  /// Optional stock agent allowlist for this session (``client.*`` always kept).
+  final List<String>? allowedAgentProviderIds;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -107,6 +116,8 @@ class ReachConnectionConfig {
     ReachMtlsConfig? mtls,
     bool? dynamicPlanning,
     String? defaultRunMode,
+    Map<String, String>? sessionEnv,
+    List<String>? allowedAgentProviderIds,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -124,6 +135,9 @@ class ReachConnectionConfig {
       mtls: mtls ?? this.mtls,
       dynamicPlanning: dynamicPlanning ?? this.dynamicPlanning,
       defaultRunMode: defaultRunMode ?? this.defaultRunMode,
+      sessionEnv: sessionEnv ?? this.sessionEnv,
+      allowedAgentProviderIds:
+          allowedAgentProviderIds ?? this.allowedAgentProviderIds,
     );
   }
 }

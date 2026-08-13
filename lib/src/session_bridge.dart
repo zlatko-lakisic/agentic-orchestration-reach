@@ -377,6 +377,11 @@ class SessionBridge {
       'agents': pack.agents,
       'mcps': pack.mcps,
       'skills': pack.skills,
+      if (config.sessionEnv != null && config.sessionEnv!.isNotEmpty)
+        'env': config.sessionEnv,
+      if (config.allowedAgentProviderIds != null &&
+          config.allowedAgentProviderIds!.isNotEmpty)
+        'allowedAgentProviderIds': config.allowedAgentProviderIds,
     });
 
     final ack = await ackWait.future.timeout(
@@ -489,6 +494,11 @@ class SessionBridge {
       'agents': pack.agents,
       'mcps': pack.mcps,
       'skills': pack.skills,
+      if (config.sessionEnv != null && config.sessionEnv!.isNotEmpty)
+        'env': config.sessionEnv,
+      if (config.allowedAgentProviderIds != null &&
+          config.allowedAgentProviderIds!.isNotEmpty)
+        'allowedAgentProviderIds': config.allowedAgentProviderIds,
     });
     final ack = await ackWait.future.timeout(
       const Duration(seconds: 60),
