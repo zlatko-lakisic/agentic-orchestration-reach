@@ -28,7 +28,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.8.0
+      ref: v0.9.0
 ```
 
 ## Quick start

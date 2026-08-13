@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-13
+
 ### Added
 
 - **`ReachRunStatus` / `onStatus`** — stream AO background progress during `chat` / `directAgent` (`processing`, `phase`, user-friendly `message`). Failures throw `ReachRunException` / `ReachRunError` with `code` so the app can handle them. Also: `runStatusUpdates` (Dart) and `on_run_status` (Python).
