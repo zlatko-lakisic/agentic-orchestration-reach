@@ -5,6 +5,7 @@
 /// `AGENTIC_SERVE_MCP_TUNNEL=1`.
 library;
 
+export 'src/catalog_client.dart';
 export 'src/catalog_errors.dart';
 export 'src/connection_config.dart';
 export 'src/ids.dart';

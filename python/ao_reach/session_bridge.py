@@ -212,6 +212,10 @@ class SessionBridge:
             payload["env"] = dict(config.session_env)
         if config.allowed_agent_provider_ids:
             payload["allowedAgentProviderIds"] = list(config.allowed_agent_provider_ids)
+        if config.allowed_mcp_provider_ids:
+            payload["allowedMcpProviderIds"] = list(config.allowed_mcp_provider_ids)
+        if config.allowed_skill_ids:
+            payload["allowedSkillIds"] = list(config.allowed_skill_ids)
         await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
@@ -263,6 +267,10 @@ class SessionBridge:
             payload["env"] = dict(cfg.session_env)
         if cfg.allowed_agent_provider_ids:
             payload["allowedAgentProviderIds"] = list(cfg.allowed_agent_provider_ids)
+        if cfg.allowed_mcp_provider_ids:
+            payload["allowedMcpProviderIds"] = list(cfg.allowed_mcp_provider_ids)
+        if cfg.allowed_skill_ids:
+            payload["allowedSkillIds"] = list(cfg.allowed_skill_ids)
         await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None

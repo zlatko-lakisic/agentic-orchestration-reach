@@ -4,6 +4,13 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-13
+
+### Added
+
+- **`ReachCatalogClient` / `GET /api/v1/catalog`** — fetch stock agents, MCPs, skills, harnesses and per-entry `requiredSecrets` for enablement UIs (Dart + Python).
+- **`allowedMcpProviderIds` / `allowedSkillIds`** on `ReachConnectionConfig` — sent on `session_overlay_register` with `sessionEnv` secrets for enabled catalog entries.
+
 ## [0.7.1] - 2026-08-13
 
 ### Fixed

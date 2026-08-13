@@ -44,6 +44,8 @@ class ReachConnectionConfig:
     default_run_mode: str = "dynamic"
     session_env: dict[str, str] | None = None
     allowed_agent_provider_ids: list[str] | None = None
+    allowed_mcp_provider_ids: list[str] | None = None
+    allowed_skill_ids: list[str] | None = None
 
     def __post_init__(self) -> None:
         self.app_id = normalize_reach_app_id(self.app_id)
@@ -56,6 +58,14 @@ class ReachConnectionConfig:
         if self.allowed_agent_provider_ids is not None:
             self.allowed_agent_provider_ids = [
                 str(x).strip() for x in self.allowed_agent_provider_ids if str(x).strip()
+            ]
+        if self.allowed_mcp_provider_ids is not None:
+            self.allowed_mcp_provider_ids = [
+                str(x).strip() for x in self.allowed_mcp_provider_ids if str(x).strip()
+            ]
+        if self.allowed_skill_ids is not None:
+            self.allowed_skill_ids = [
+                str(x).strip() for x in self.allowed_skill_ids if str(x).strip()
             ]
 
     def copy_with(self, **kwargs: object) -> ReachConnectionConfig:

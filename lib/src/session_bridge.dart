@@ -382,6 +382,11 @@ class SessionBridge {
       if (config.allowedAgentProviderIds != null &&
           config.allowedAgentProviderIds!.isNotEmpty)
         'allowedAgentProviderIds': config.allowedAgentProviderIds,
+      if (config.allowedMcpProviderIds != null &&
+          config.allowedMcpProviderIds!.isNotEmpty)
+        'allowedMcpProviderIds': config.allowedMcpProviderIds,
+      if (config.allowedSkillIds != null && config.allowedSkillIds!.isNotEmpty)
+        'allowedSkillIds': config.allowedSkillIds,
     });
 
     final ack = await ackWait.future.timeout(
@@ -499,6 +504,11 @@ class SessionBridge {
       if (config.allowedAgentProviderIds != null &&
           config.allowedAgentProviderIds!.isNotEmpty)
         'allowedAgentProviderIds': config.allowedAgentProviderIds,
+      if (config.allowedMcpProviderIds != null &&
+          config.allowedMcpProviderIds!.isNotEmpty)
+        'allowedMcpProviderIds': config.allowedMcpProviderIds,
+      if (config.allowedSkillIds != null && config.allowedSkillIds!.isNotEmpty)
+        'allowedSkillIds': config.allowedSkillIds,
     });
     final ack = await ackWait.future.timeout(
       const Duration(seconds: 60),

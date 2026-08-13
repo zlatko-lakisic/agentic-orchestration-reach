@@ -47,6 +47,8 @@ class ReachConnectionConfig {
     this.defaultRunMode = 'dynamic',
     this.sessionEnv,
     this.allowedAgentProviderIds,
+    this.allowedMcpProviderIds,
+    this.allowedSkillIds,
   }) : appId = normalizeReachAppId(appId);
 
   /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
@@ -96,11 +98,18 @@ class ReachConnectionConfig {
   final String defaultRunMode;
 
   /// Provider secrets / base URLs sent on `session_overlay_register` (`env`).
-  /// Allowed keys: OPENAI_API_KEY, ANTHROPIC_API_KEY, HF_TOKEN, base URLs, …
+  /// Allowed keys: LLM provider keys plus catalog-declared MCP/skill secrets
+  /// (see [ReachCatalog.sessionEnvAllowedKeys] from `GET /api/v1/catalog`).
   final Map<String, String>? sessionEnv;
 
   /// Optional stock agent allowlist for this session (``client.*`` always kept).
   final List<String>? allowedAgentProviderIds;
+
+  /// Optional stock MCP allowlist for this session (``client.*`` always kept).
+  final List<String>? allowedMcpProviderIds;
+
+  /// Optional stock skill allowlist for this session (``client.*`` always kept).
+  final List<String>? allowedSkillIds;
 
   ReachConnectionConfig copyWith({
     String? baseUrl,
@@ -118,6 +127,8 @@ class ReachConnectionConfig {
     String? defaultRunMode,
     Map<String, String>? sessionEnv,
     List<String>? allowedAgentProviderIds,
+    List<String>? allowedMcpProviderIds,
+    List<String>? allowedSkillIds,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -138,6 +149,8 @@ class ReachConnectionConfig {
       sessionEnv: sessionEnv ?? this.sessionEnv,
       allowedAgentProviderIds:
           allowedAgentProviderIds ?? this.allowedAgentProviderIds,
+      allowedMcpProviderIds: allowedMcpProviderIds ?? this.allowedMcpProviderIds,
+      allowedSkillIds: allowedSkillIds ?? this.allowedSkillIds,
     );
   }
 }

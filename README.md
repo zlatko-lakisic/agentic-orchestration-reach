@@ -28,7 +28,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.7.1
+      ref: v0.8.0
 ```
 
 ## Quick start
@@ -69,20 +69,34 @@ await bridge.stop();
 
 Set `dynamicPlanning: true` / `defaultRunMode` on `ReachConnectionConfig` for sticky app defaults (AO Admin **Access → Dynamic planning by app** can also set sticky prefs for the same `appId`).
 
-Pass per-client keys and stock agent allowlists on the same config:
+Pass per-client keys and stock allowlists on the same config (fetch the full catalogue first for UI toggles + secret fields):
 
 ```dart
+final catalog = await ReachCatalogClient().fetch(
+  ReachConnectionConfig(
+    baseUrl: 'https://ao-host:8765',
+    appId: 'comstar-ha',
+    headers: const {},
+    mtls: myMtls, // when engine requires mTLS
+  ),
+);
+// catalog.agents / .mcps / .skills / .harnesses each expose requiredSecrets
+
 ReachConnectionConfig(
   baseUrl: 'https://ao-host:8765',
   appId: 'comstar-ha',
   headers: const {},
   sessionEnv: {
     'OPENAI_API_KEY': Platform.environment['OPENAI_API_KEY']!,
+    'TAVILY_API_KEY': userEnteredTavilyKey,
   },
-  allowedAgentProviderIds: const ['gpt_research'], // not for home-assistant
+  allowedAgentProviderIds: const ['gpt_research'],
+  allowedMcpProviderIds: const ['search_tavily'],
+  allowedSkillIds: const ['web_research'],
 );
 ```
 
+Empty allowlists mean unrestricted (current global catalog). Harness profiles are listed in the catalogue but enabled via each agent's `harnessProfile`, not a session allowlist.
 ### Speech (optional, AO ≥ 1.28)
 
 When the engine advertises `speech` on `hello`:
