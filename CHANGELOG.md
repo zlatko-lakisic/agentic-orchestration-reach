@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-13
+
 ### Added
 
 - **`ReachConnectionConfig.sessionEnv` / `allowedAgentProviderIds`** — pass provider API keys and stock agent allowlists on `session_overlay_register` (AO applies session-scoped env + planner allowlist).
