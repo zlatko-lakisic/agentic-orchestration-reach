@@ -74,7 +74,7 @@ class ReachMtlsEnroller {
         final outDir = materialDir?.trim().isNotEmpty == true
             ? materialDir!.trim()
             : p.join(Directory.current.path, '.ao-mtls');
-        return persistReachMtlsMaterial(
+        return await persistReachMtlsMaterial(
           dir: outDir,
           clientCertPem: enrolled.certificatePem,
           clientKeyPem: keyPem,

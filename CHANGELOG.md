@@ -4,6 +4,12 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-13
+
+### Fixed
+
+- **mTLS enroller** — `await` `persistReachMtlsMaterial` inside try/finally so `dart analyze` passes (`unawaited_return_in_try_block`).
+
 ## [0.7.0] - 2026-08-13
 
 ### Added
