@@ -109,6 +109,10 @@ class SessionBridge {
   ///
   /// Pass [onStatus] to stream user-friendly progress (`message`) while AO works.
   /// Failures throw [ReachRunException] with [ReachRunException.code] when AO sends one.
+  ///
+  /// Optional [images] — `[{mimeType, dataBase64, name?}, …]` in display order.
+  /// AO routes those turns to a vision model; engines that predate the multimodal
+  /// protocol ignore the field and answer from [text] alone.
   Future<Map<String, dynamic>> directAgent({
     required String agentProviderId,
     required String text,
@@ -117,6 +121,7 @@ class SessionBridge {
     Map<String, dynamic>? responseFormat,
     Map<String, dynamic>? jsonSchema,
     List<String>? mcpProviderIds,
+    List<Map<String, dynamic>>? images,
     void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 5),
   }) async {
@@ -142,6 +147,7 @@ class SessionBridge {
       if (responseFormat != null) 'responseFormat': responseFormat,
       if (jsonSchema != null) 'jsonSchema': jsonSchema,
       if (mcpProviderIds != null && mcpProviderIds.isNotEmpty) 'mcpProviderIds': mcpProviderIds,
+      if (images != null && images.isNotEmpty) 'images': images,
     });
     try {
       return await pending.done.future.timeout(timeout);
@@ -158,12 +164,15 @@ class SessionBridge {
   /// iterative is honored as a hint / for AO HTTP parity.
   ///
   /// [onStatus] receives processing/phase/`message` updates suitable for live UI text.
+  ///
+  /// Optional [images] — see the [directAgent] multimodal extension.
   Future<Map<String, dynamic>> chat({
     required String text,
     String? questionId,
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
+    List<Map<String, dynamic>>? images,
     void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 10),
   }) async {
@@ -194,6 +203,7 @@ class SessionBridge {
       if (sessionId != null && sessionId.trim().isNotEmpty) 'sessionId': sessionId.trim(),
       if (selectedAgentProviderIds != null && selectedAgentProviderIds.isNotEmpty)
         'selectedAgentProviderIds': selectedAgentProviderIds,
+      if (images != null && images.isNotEmpty) 'images': images,
     });
     try {
       return await pending.done.future.timeout(timeout);
@@ -210,6 +220,7 @@ class SessionBridge {
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
+    List<Map<String, dynamic>>? images,
     void Function(ReachRunStatus status)? onStatus,
     Duration timeout = const Duration(minutes: 10),
   }) =>
@@ -219,6 +230,7 @@ class SessionBridge {
         selectedAgentProviderIds: selectedAgentProviderIds,
         runMode: runMode,
         sessionId: sessionId,
+        images: images,
         onStatus: onStatus,
         timeout: timeout,
       );

@@ -102,6 +102,24 @@ ReachConnectionConfig(
 ```
 
 Empty allowlists mean unrestricted (current global catalog). Harness profiles are listed in the catalogue but enabled via each agent's `harnessProfile`, not a session allowlist.
+
+### Images (optional)
+
+`directAgent`, `chat`, and `runDynamic` accept ordered stills. AO answers those turns with a vision model instead of the planner, so the reply is plain text with no tool calls:
+
+```dart
+final verdict = await bridge.directAgent(
+  agentProviderId: 'client.vision_scene_analyzer',
+  text: 'Who is at the gate?',
+  images: [
+    {'mimeType': 'image/jpeg', 'dataBase64': base64Encode(frame1), 'name': 'gate_1.jpg'},
+    {'mimeType': 'image/jpeg', 'dataBase64': base64Encode(frame2), 'name': 'gate_2.jpg'},
+  ],
+);
+```
+
+`mimeType` must be `image/jpeg`, `image/png`, `image/webp`, or `image/gif`. AO caps a turn at 16 images, 4 MiB each, 20 MiB total and rejects anything over that with `invalid_images` or `payload_too_large` before the run starts. If the engine has no vision-capable model configured, the run fails with `vision_unavailable` — it will not fall back to a text-only model and describe images it never saw. Prefix `text` with `[model=gpt-4o-mini]` to request a specific vision model.
+
 ### Speech (optional, AO ≥ 1.28)
 
 When the engine advertises `speech` on `hello`:

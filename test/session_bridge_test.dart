@@ -374,6 +374,44 @@ void main() {
     expect(result['text'], 'done');
   });
 
+  test('directAgent sends ordered images when given', () async {
+    await completeHandshake();
+    final images = [
+      {'mimeType': 'image/jpeg', 'dataBase64': 'AAAA', 'name': 'gate_1.jpg'},
+      {'mimeType': 'image/jpeg', 'dataBase64': 'BBBB', 'name': 'gate_2.jpg'},
+    ];
+    final run = bridge.directAgent(
+      agentProviderId: 'client.demo_agent',
+      text: 'who is at the gate',
+      questionId: 'q-img',
+      images: images,
+    );
+    final msg = await server.waitForType('direct_agent');
+    final sent = (msg['images'] as List).cast<Map>();
+    expect(sent.map((i) => i['name']), ['gate_1.jpg', 'gate_2.jpg']);
+    server.push({
+      'type': 'chunk',
+      'questionId': 'q-img',
+      'stream': 'stdout',
+      'text': 'PERSON',
+    });
+    server.push({'type': 'run_end', 'questionId': 'q-img', 'ok': true});
+    expect((await run)['text'], 'PERSON');
+  });
+
+  test('chat omits images when empty', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'why is the sky blue',
+      questionId: 'q-no-img',
+      images: const [],
+    );
+    final msg = await server.waitForType('chat');
+    expect(msg.containsKey('images'), isFalse);
+    server.push({'type': 'run_end', 'questionId': 'q-no-img', 'ok': true});
+    await run;
+  });
+
   test('directAgent fails on run_end ok=false', () async {
     await completeHandshake();
     final run = bridge.directAgent(

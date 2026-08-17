@@ -313,9 +313,16 @@ class SessionBridge:
         context: str = "",
         question_id: str | None = None,
         mcp_provider_ids: list[str] | None = None,
+        images: list[dict[str, Any]] | None = None,
         on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 300.0,
     ) -> dict[str, Any]:
+        """Run a single agent (`type: direct_agent`).
+
+        Optional ``images`` — ``[{mimeType, dataBase64, name?}, ...]`` in display
+        order. AO routes those turns to a vision model; engines that predate the
+        multimodal protocol ignore the field and answer from ``text`` alone.
+        """
         if not self.is_active or self._ws is None:
             raise RuntimeError("Session bridge is not active — cannot run client.* agents")
         prefix = self._last_config.question_id_prefix if self._last_config else "reach"
@@ -338,6 +345,8 @@ class SessionBridge:
             payload["appId"] = self._last_config.app_id
         if mcp_provider_ids:
             payload["mcpProviderIds"] = mcp_provider_ids
+        if images:
+            payload["images"] = list(images)
         await self._send(payload)
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
@@ -353,10 +362,14 @@ class SessionBridge:
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
+        images: list[dict[str, Any]] | None = None,
         on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
-        """Run AO dynamic planning (`type: chat`) on the owning session WebSocket."""
+        """Run AO dynamic planning (`type: chat`) on the owning session WebSocket.
+
+        Optional ``images`` — see [direct_agent] multimodal extension.
+        """
         if not self.is_active or self._ws is None:
             raise RuntimeError("Session bridge is not active — cannot run dynamic chat")
         cfg = self._last_config
@@ -382,6 +395,8 @@ class SessionBridge:
             payload["sessionId"] = str(session_id).strip()
         if selected_agent_provider_ids:
             payload["selectedAgentProviderIds"] = list(selected_agent_provider_ids)
+        if images:
+            payload["images"] = list(images)
         await self._send(payload)
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
@@ -397,6 +412,7 @@ class SessionBridge:
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
+        images: list[dict[str, Any]] | None = None,
         on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
@@ -407,6 +423,7 @@ class SessionBridge:
             selected_agent_provider_ids=selected_agent_provider_ids,
             run_mode=run_mode,
             session_id=session_id,
+            images=images,
             on_status=on_status,
             timeout=timeout,
         )
