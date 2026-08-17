@@ -10,6 +10,7 @@ import yaml
 from ao_reach.connection_config import normalize_reach_app_id, reach_ws_uri
 from ao_reach.ids import bare_agent_id, to_client_agent_id
 from ao_reach.overlay_packer import OverlayPacker
+from ao_reach.run_status import ReachRunError
 from ao_reach.session_bridge import SessionBridge, SessionBridgeState
 from ao_reach.speech_client import SpeechCapabilities, TranscriptionResult
 
@@ -153,3 +154,49 @@ def test_overlay_packer(tmp_path: Path) -> None:
     assert pack.agents[0]["selfcontained"] is False
     assert "## Spoken" in pack.agents[0]["backstory"]
     assert pack.skills[0]["id"] == "client.spoken_output"
+
+
+def test_cancel_sends_cancel_frame() -> None:
+    payload = asyncio.run(
+        _capture_payload(SessionBridge(), lambda b: b.cancel("q-1"))
+    )
+    assert payload == {"type": "cancel", "questionId": "q-1"}
+
+
+def test_cancel_run_end_raises_cancelled() -> None:
+    async def _run() -> None:
+        bridge = SessionBridge()
+        bridge.state = SessionBridgeState.ACTIVE
+        bridge._ws = object()
+        sent: list[dict[str, object]] = []
+
+        async def fake_send(payload: dict[str, object]) -> None:
+            sent.append(payload)
+
+        bridge._send = fake_send  # type: ignore[method-assign]
+        pending = asyncio.create_task(
+            bridge.chat(text="hi", question_id="q-cancel", timeout=5.0)
+        )
+        # Wait until chat registered a pending run and sent the chat frame
+        for _ in range(50):
+            if any(p.get("type") == "chat" for p in sent):
+                break
+            await asyncio.sleep(0.01)
+        await bridge.cancel("q-cancel")
+        assert any(p.get("type") == "cancel" for p in sent)
+        bridge._on_run_end(
+            {
+                "type": "run_end",
+                "questionId": "q-cancel",
+                "ok": False,
+                "code": "cancelled",
+                "error": "Cancelled.",
+            }
+        )
+        try:
+            await pending
+            raise AssertionError("expected ReachRunError")
+        except ReachRunError as err:
+            assert err.code == "cancelled"
+
+    asyncio.run(_run())

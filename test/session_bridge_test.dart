@@ -429,6 +429,31 @@ void main() {
     await expectLater(run, throwsA(isA<ReachRunException>()));
   });
 
+  test('cancel sends cancel frame and settles cancelled run_end', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'long job',
+      questionId: 'q-cancel',
+    );
+    await server.waitForType('chat');
+    bridge.cancel('q-cancel');
+    final cancelMsg = await server.waitForType('cancel');
+    expect(cancelMsg['questionId'], 'q-cancel');
+    server.push({
+      'type': 'run_end',
+      'questionId': 'q-cancel',
+      'ok': false,
+      'code': 'cancelled',
+      'error': 'Cancelled.',
+    });
+    await expectLater(
+      run,
+      throwsA(
+        isA<ReachRunException>().having((e) => e.code, 'code', 'cancelled'),
+      ),
+    );
+  });
+
   test('mcp_tunnel_request unknown path → 404 or 503', () async {
     await completeHandshake();
     server.clientMessages.clear();

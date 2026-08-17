@@ -404,6 +404,27 @@ class SessionBridge:
             self._pending_runs.pop(qid, None)
             raise TimeoutError(f"chat timed out ({qid})") from None
 
+    async def cancel(self, question_id: str) -> None:
+        """Ask the engine to cancel one in-flight chat / direct_agent by questionId.
+
+        Does not close the WebSocket or clear the session overlay. The pending
+        future completes with ReachRunError (code cancelled) when AO ends the run.
+        """
+        qid = (question_id or "").strip()
+        if not qid:
+            raise ValueError("cancel requires a non-empty question_id")
+        if not self.is_active or self._ws is None:
+            raise RuntimeError("Session bridge is not active — cannot cancel")
+        await self._send({"type": "cancel", "questionId": qid})
+        run = self._pending_runs.get(qid)
+        if run is not None and not run.done.done():
+            run.last_error = "Cancelled."
+            run.last_error_code = "cancelled"
+
+    async def cancel_run(self, question_id: str) -> None:
+        """Alias for [cancel]."""
+        await self.cancel(question_id)
+
     async def run_dynamic(
         self,
         *,
@@ -556,10 +577,15 @@ class SessionBridge:
         err = msg.get("error") or run.last_error
         code = msg.get("code") or run.last_error_code
         if not ok:
+            cancelled = str(code or "") == "cancelled"
             status = ReachRunStatus(
                 processing=False,
-                phase="error",
-                message=str(err) if err else "Request failed",
+                phase="cancelled" if cancelled else "error",
+                message=(
+                    str(err)
+                    if err
+                    else ("Cancelled." if cancelled else "Request failed")
+                ),
                 code=str(code) if code else None,
                 question_id=str(qid),
                 run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),

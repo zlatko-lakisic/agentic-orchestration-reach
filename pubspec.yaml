@@ -2,7 +2,7 @@ name: ao_reach
 description: >
   AO Reach — client SDK for agentic-orchestration session overlays and reverse
   MCP tunnels (remote workstation → shared AO daemon).
-version: 0.10.0
+version: 0.11.0
 repository: https://github.com/zlatko-lakisic/agentic-orchestration-reach
 homepage: https://github.com/zlatko-lakisic/agentic-orchestration-reach
 

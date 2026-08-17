@@ -4,6 +4,14 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-17
+
+### Added
+
+- **Per-turn cancellation** — Dart and Python `SessionBridge.cancel(questionId)`
+  send `{type: "cancel", questionId}` without closing the WebSocket. Cancelled
+  runs complete with structured `code: cancelled` status/errors.
+
 ## [0.10.0] - 2026-08-17
 
 ### Added

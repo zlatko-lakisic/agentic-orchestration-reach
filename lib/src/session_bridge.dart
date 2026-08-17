@@ -235,6 +235,28 @@ class SessionBridge {
         timeout: timeout,
       );
 
+  /// Ask the engine to cancel one in-flight [chat] / [directAgent] by [questionId].
+  ///
+  /// Does not close the WebSocket or clear the session overlay. The pending
+  /// future completes with [ReachRunException] (`code: cancelled`) when AO ends
+  /// the run, or immediately if there is no local pending run.
+  void cancel(String questionId) {
+    final qid = questionId.trim();
+    if (qid.isEmpty) {
+      throw ArgumentError('cancel requires a non-empty questionId');
+    }
+    if (!isActive || _channel == null) {
+      throw StateError('Session bridge is not active — cannot cancel');
+    }
+    _send({'type': 'cancel', 'questionId': qid});
+    final run = _pendingRuns[qid];
+    if (run != null && !run.done.isCompleted) {
+      // Soft-complete locally if the engine never answers; _onRunEnd also settles.
+      run.lastError = 'Cancelled.';
+      run.lastErrorCode = 'cancelled';
+    }
+  }
+
   void _emit() {
     if (!_statusController.isClosed) _statusController.add(this);
   }
@@ -764,10 +786,13 @@ class SessionBridge {
     final err = msg['error']?.toString() ?? run.lastError;
     final code = msg['code']?.toString() ?? run.lastErrorCode;
     if (!ok) {
+      final cancelled = code == 'cancelled';
       final status = ReachRunStatus(
         processing: false,
-        phase: 'error',
-        message: (err != null && err.isNotEmpty) ? err : 'Request failed',
+        phase: cancelled ? 'cancelled' : 'error',
+        message: (err != null && err.isNotEmpty)
+            ? err
+            : (cancelled ? 'Cancelled.' : 'Request failed'),
         code: code,
         questionId: qid,
         runId: msg['run_id']?.toString() ?? msg['runId']?.toString(),

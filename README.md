@@ -17,9 +17,18 @@ Product name: **AO Reach**
   - `AGENTIC_SERVE_MCP_TUNNEL=1` (when registering `tunnel://session-mcp/…` MCPs)
 - Optional speech (AO ≥ **v1.28.0**): `AGENTIC_SPEECH_ENABLED=1` + sidecars — see AO `speech/README.md`
 - Optional mTLS (AO ≥ **v1.29.0**): engine TLS + client certs — see **mTLS** below
+- Optional streaming: `AGENTIC_SERVE_STREAM_STDOUT=1` / `AGENTIC_SERVE_STREAM_THOUGHTS=1`
 - Dart SDK ^3.5
 - Node.js `npx` when spawning stdio MCPs via `LocalMcpHost`
 - `openssl` on PATH when using `ReachMtlsEnroller`
+
+## Cancel an in-flight run
+
+Send `{ type: cancel, questionId }` (or call `SessionBridge.cancel(questionId)` /
+`await bridge.cancel(question_id)`) to stop **one** tagged chat / direct_agent
+without closing the WebSocket or clearing the overlay. The engine replies with
+`status` / `run_end` using `code: cancelled`. Untagged busy runs cannot be
+cancelled this way — always send a `questionId`.
 
 ## Install
 
@@ -28,7 +37,7 @@ dependencies:
   ao_reach:
     git:
       url: https://github.com/zlatko-lakisic/agentic-orchestration-reach.git
-      ref: v0.10.0
+      ref: v0.11.0
 ```
 
 ## Quick start
