@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-17
+
 ### Added
 
 - **`images` on `chat` / `directAgent` / `runDynamic`** — send ordered stills as `[{mimeType, dataBase64, name?}]` (`image/jpeg|png|webp|gif`) and AO answers with a vision model instead of the planner. Optional and omitted from the payload when empty, so existing calls are unchanged; engines older than the multimodal protocol ignore the field. AO enforces 16 images / 4 MiB each / 20 MiB total and fails with `invalid_images`, `payload_too_large`, or `vision_unavailable` rather than answering without seeing them.
