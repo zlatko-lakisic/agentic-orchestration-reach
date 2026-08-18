@@ -4,6 +4,10 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Changed
+
+- **Overlay empty MCP/skill allowlist** — when a session overlay is registered and `allowedMcpProviderIds` / `allowedSkillIds` are omitted or empty, the engine planner catalog is overlay `client.*` entries only (not the full stock catalog). Pin stock ids explicitly to opt in (e.g. `search_tavily`).
+
 ## [0.12.0] - 2026-08-17
 
 ### Added
