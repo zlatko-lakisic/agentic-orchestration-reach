@@ -4,6 +4,15 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-17
+
+### Added
+
+- **Overlay prepare progress** — while waiting for `session_overlay_ack`, engine
+  `status` frames (not only stderr chunks) update `register_progress` and notify
+  `on_status` / `statusChanges`, so clients can show lines such as
+  `Downloading qwen3.6:27b — 84%` instead of looking idle.
+
 ## [0.11.0] - 2026-08-17
 
 ### Added

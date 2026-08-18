@@ -681,6 +681,13 @@ class SessionBridge {
         _onRunChunk(msg);
         break;
       case 'status':
+        if (_ackWait != null && !(_ackWait!.isCompleted)) {
+          final text = (msg['message']?.toString() ?? '').trim();
+          if (text.isNotEmpty) {
+            registerProgress = text;
+            _emit();
+          }
+        }
         _onRunStatus(msg);
         break;
       case 'run_start':

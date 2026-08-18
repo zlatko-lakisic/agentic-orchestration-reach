@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import yaml
@@ -200,3 +201,26 @@ def test_cancel_run_end_raises_cancelled() -> None:
             assert err.code == "cancelled"
 
     asyncio.run(_run())
+
+
+def test_overlay_status_updates_register_progress() -> None:
+    class _Pending:
+        def done(self) -> bool:
+            return False
+
+    bridge = SessionBridge()
+    bridge._ack_wait = _Pending()  # type: ignore[assignment]
+    seen: list[SessionBridge] = []
+    bridge.on_status(seen.append)
+    bridge._on_message(
+        json.dumps(
+            {
+                "type": "status",
+                "processing": True,
+                "phase": "preparing",
+                "message": "Downloading qwen3.6:27b — 84%",
+            }
+        )
+    )
+    assert bridge.register_progress == "Downloading qwen3.6:27b — 84%"
+    assert seen

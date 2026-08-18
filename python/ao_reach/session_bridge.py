@@ -494,6 +494,11 @@ class SessionBridge:
                     self._emit()
             self._on_run_chunk(msg)
         elif typ == "status":
+            if self._ack_wait and not self._ack_wait.done():
+                msg_text = str(msg.get("message") or "").strip()
+                if msg_text:
+                    self.register_progress = msg_text
+                    self._emit()
             self._on_run_status(msg)
         elif typ == "run_start":
             self._on_run_start(msg)
