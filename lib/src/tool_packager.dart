@@ -95,7 +95,7 @@ List<int> buildBundleZip({
         wheelFile.readAsBytesSync(),
       ),
     );
-  return ZipEncoder().encode(archive) ?? [];
+  return ZipEncoder().encode(archive);
 }
 
 Future<CustomToolBundle> packageCustomTool({

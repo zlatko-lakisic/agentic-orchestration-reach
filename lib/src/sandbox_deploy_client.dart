@@ -38,8 +38,8 @@ class ReachSandboxDeployClient {
 
   final http.Client? _httpClient;
 
-  http.Client _client(ReachConnectionConfig config, {http.Client? owned}) {
-    if (_httpClient != null) return _httpClient!;
+  http.Client _client(ReachConnectionConfig config) {
+    if (_httpClient != null) return _httpClient;
     final mtls = config.mtls;
     if (mtls != null) {
       assertReachMtlsUsesTls(config.baseUrl);
