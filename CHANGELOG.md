@@ -15,6 +15,12 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
   `client.*` tool IDs for e2e harnesses; `python/ao_reach/mock_client_runner.py` CLI
   for edge smoke.
 
+### Fixed
+
+- **Sandbox MCP registration** — on successful AO sandbox upload/activate,
+  `HybridSessionMcpBootstrap` no longer appends loopback sandbox MCP entries to
+  `session_overlay_register.mcps`; AO merges activated tools server-side via
+  `active_sandbox_mcp_entries`. Tunnel fallback still registers tunnel URLs.
 
 ### Changed
 
