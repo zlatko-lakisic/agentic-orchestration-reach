@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-19
+
 ### Added
 
 - **Custom-tool sandbox contract (v1)** — wheel+manifest zip bundle packaging
@@ -21,6 +23,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
   `HybridSessionMcpBootstrap` no longer appends loopback sandbox MCP entries to
   `session_overlay_register.mcps`; AO merges activated tools server-side via
   `active_sandbox_mcp_entries`. Tunnel fallback still registers tunnel URLs.
+
+## [0.13.0] - 2026-08-18
 
 ### Changed
 
