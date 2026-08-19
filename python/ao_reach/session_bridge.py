@@ -321,6 +321,7 @@ class SessionBridge:
         text: str,
         context: str = "",
         question_id: str | None = None,
+        priority: str | int | None = None,
         mcp_provider_ids: list[str] | None = None,
         images: list[dict[str, Any]] | None = None,
         on_status: Callable[[ReachRunStatus], None] | None = None,
@@ -356,6 +357,8 @@ class SessionBridge:
             payload["mcpProviderIds"] = mcp_provider_ids
         if images:
             payload["images"] = list(images)
+        if priority is not None:
+            payload["priority"] = priority
         await self._send(payload)
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
@@ -368,6 +371,7 @@ class SessionBridge:
         *,
         text: str,
         question_id: str | None = None,
+        priority: str | int | None = None,
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
@@ -406,6 +410,8 @@ class SessionBridge:
             payload["selectedAgentProviderIds"] = list(selected_agent_provider_ids)
         if images:
             payload["images"] = list(images)
+        if priority is not None:
+            payload["priority"] = priority
         await self._send(payload)
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
@@ -439,6 +445,7 @@ class SessionBridge:
         *,
         text: str,
         question_id: str | None = None,
+        priority: str | int | None = None,
         selected_agent_provider_ids: list[str] | None = None,
         run_mode: str | None = None,
         session_id: str | None = None,
@@ -450,6 +457,7 @@ class SessionBridge:
         return await self.chat(
             text=text,
             question_id=question_id,
+            priority=priority,
             selected_agent_provider_ids=selected_agent_provider_ids,
             run_mode=run_mode,
             session_id=session_id,

@@ -16,6 +16,12 @@ class ReachRunStatus {
     this.code,
     this.questionId,
     this.runId,
+    this.queuePhase,
+    this.queuePosition,
+    this.queueLength,
+    this.queuePriority,
+    this.queuePriorityLabel,
+    this.elapsedMs,
     this.raw = const {},
   });
 
@@ -36,9 +42,22 @@ class ReachRunStatus {
       code: json['code']?.toString(),
       questionId: json['question_id']?.toString() ?? json['questionId']?.toString(),
       runId: json['run_id']?.toString() ?? json['runId']?.toString(),
+      queuePhase: json['queuePhase']?.toString() ?? json['queue_phase']?.toString(),
+      queuePosition: _intOrNull(json['queuePosition'] ?? json['queue_position']),
+      queueLength: _intOrNull(json['queueLength'] ?? json['queue_length']),
+      queuePriority: _intOrNull(json['queuePriority'] ?? json['queue_priority']),
+      queuePriorityLabel: json['queuePriorityLabel']?.toString() ??
+          json['queue_priority_label']?.toString(),
+      elapsedMs: _doubleOrNull(json['elapsedMs'] ?? json['elapsed_ms']),
       raw: Map<String, dynamic>.from(json),
     );
   }
+
+  static int? _intOrNull(Object? value) =>
+      value is num ? value.toInt() : null;
+
+  static double? _doubleOrNull(Object? value) =>
+      value is num ? value.toDouble() : null;
 
   /// True while AO is still working on this request.
   final bool processing;
@@ -61,7 +80,30 @@ class ReachRunStatus {
 
   final String? questionId;
   final String? runId;
+
+  /// Scheduler phase while waiting (`planning` / `execution`) when [phase] is `queued`.
+  final String? queuePhase;
+
+  /// 1-based position among pending tickets at [queuePhase].
+  final int? queuePosition;
+
+  /// Total pending tickets at [queuePhase].
+  final int? queueLength;
+
+  /// Effective priority (0–100) after server clamp/aging.
+  final int? queuePriority;
+
+  /// Named tier (`realtime`, `high`, …) when the client sent a label.
+  final String? queuePriorityLabel;
+
+  /// Wait time so far in milliseconds (queue heartbeats include this).
+  final double? elapsedMs;
+
   final Map<String, dynamic> raw;
+
+  bool get isQueued => phase == 'queued';
+
+  bool get isPreempted => phase == 'preempted';
 
   bool get isError => phase == 'error' || code != null && !processing;
 

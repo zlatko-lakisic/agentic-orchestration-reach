@@ -119,6 +119,7 @@ class SessionBridge {
     required String text,
     String context = '',
     String? questionId,
+    Object? priority,
     Map<String, dynamic>? responseFormat,
     Map<String, dynamic>? jsonSchema,
     List<String>? mcpProviderIds,
@@ -149,6 +150,7 @@ class SessionBridge {
       if (jsonSchema != null) 'jsonSchema': jsonSchema,
       if (mcpProviderIds != null && mcpProviderIds.isNotEmpty) 'mcpProviderIds': mcpProviderIds,
       if (images != null && images.isNotEmpty) 'images': images,
+      if (priority != null) 'priority': priority,
     });
     try {
       return await pending.done.future.timeout(timeout);
@@ -170,6 +172,7 @@ class SessionBridge {
   Future<Map<String, dynamic>> chat({
     required String text,
     String? questionId,
+    Object? priority,
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
@@ -205,6 +208,7 @@ class SessionBridge {
       if (selectedAgentProviderIds != null && selectedAgentProviderIds.isNotEmpty)
         'selectedAgentProviderIds': selectedAgentProviderIds,
       if (images != null && images.isNotEmpty) 'images': images,
+      if (priority != null) 'priority': priority,
     });
     try {
       return await pending.done.future.timeout(timeout);
@@ -218,6 +222,7 @@ class SessionBridge {
   Future<Map<String, dynamic>> runDynamic({
     required String text,
     String? questionId,
+    Object? priority,
     List<String>? selectedAgentProviderIds,
     String? runMode,
     String? sessionId,
@@ -228,6 +233,7 @@ class SessionBridge {
       chat(
         text: text,
         questionId: questionId,
+        priority: priority,
         selectedAgentProviderIds: selectedAgentProviderIds,
         runMode: runMode,
         sessionId: sessionId,

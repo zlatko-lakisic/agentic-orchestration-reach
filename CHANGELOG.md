@@ -4,6 +4,18 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-19
+
+### Added
+
+- **`priority` on `chat` / `directAgent` / `runDynamic`** — optional named tier
+  (`realtime`, `high`, …) or numeric 0–100; forwarded on the WebSocket payload
+  so AO can order global execution queue admission.
+- **`ReachRunStatus` queue fields** — `queuePhase`, `queuePosition`, `queueLength`,
+  `queuePriority`, `queuePriorityLabel`, `elapsedMs` parsed from AO `status`
+  frames while a run waits in the global queue; `isQueued` / `isPreempted`
+  helpers for terminal `preempted` / `queue_preempted` events.
+
 ## [0.14.0] - 2026-08-19
 
 ### Added

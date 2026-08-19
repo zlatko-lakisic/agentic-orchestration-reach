@@ -376,6 +376,46 @@ void main() {
     expect(result['text'], 'done');
   });
 
+  test('chat sends string priority when given', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'vision job',
+      questionId: 'q-pri-str',
+      priority: 'realtime',
+    );
+    final msg = await server.waitForType('chat');
+    expect(msg['questionId'], 'q-pri-str');
+    expect(msg['priority'], 'realtime');
+    server.push({'type': 'run_end', 'questionId': 'q-pri-str', 'ok': true});
+    await run;
+  });
+
+  test('chat sends numeric priority when given', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'background job',
+      questionId: 'q-pri-num',
+      priority: 25,
+    );
+    final msg = await server.waitForType('chat');
+    expect(msg['questionId'], 'q-pri-num');
+    expect(msg['priority'], 25);
+    server.push({'type': 'run_end', 'questionId': 'q-pri-num', 'ok': true});
+    await run;
+  });
+
+  test('chat omits priority when not given', () async {
+    await completeHandshake();
+    final run = bridge.chat(
+      text: 'default priority',
+      questionId: 'q-no-pri',
+    );
+    final msg = await server.waitForType('chat');
+    expect(msg.containsKey('priority'), isFalse);
+    server.push({'type': 'run_end', 'questionId': 'q-no-pri', 'ok': true});
+    await run;
+  });
+
   test('directAgent sends ordered images when given', () async {
     await completeHandshake();
     final images = [

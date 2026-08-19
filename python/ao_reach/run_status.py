@@ -23,12 +23,22 @@ class ReachRunStatus:
     code: str | None = None
     question_id: str | None = None
     run_id: str | None = None
+    queue_phase: str | None = None
+    queue_position: int | None = None
+    queue_length: int | None = None
+    queue_priority: int | None = None
+    queue_priority_label: str | None = None
+    elapsed_ms: float | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> ReachRunStatus:
         step = data.get("step")
         step_count = data.get("stepCount", data.get("step_count"))
+        queue_position = data.get("queuePosition", data.get("queue_position"))
+        queue_length = data.get("queueLength", data.get("queue_length"))
+        queue_priority = data.get("queuePriority", data.get("queue_priority"))
+        elapsed_ms = data.get("elapsedMs", data.get("elapsed_ms"))
         return cls(
             processing=data.get("processing") is True,
             phase=str(data.get("phase") or "info"),
@@ -52,8 +62,34 @@ class ReachRunStatus:
                 if data.get("run_id") is not None
                 else (str(data["runId"]) if data.get("runId") is not None else None)
             ),
+            queue_phase=(
+                str(data["queuePhase"])
+                if data.get("queuePhase") is not None
+                else (str(data["queue_phase"]) if data.get("queue_phase") is not None else None)
+            ),
+            queue_position=int(queue_position) if isinstance(queue_position, (int, float)) else None,
+            queue_length=int(queue_length) if isinstance(queue_length, (int, float)) else None,
+            queue_priority=int(queue_priority) if isinstance(queue_priority, (int, float)) else None,
+            queue_priority_label=(
+                str(data["queuePriorityLabel"])
+                if data.get("queuePriorityLabel") is not None
+                else (
+                    str(data["queue_priority_label"])
+                    if data.get("queue_priority_label") is not None
+                    else None
+                )
+            ),
+            elapsed_ms=float(elapsed_ms) if isinstance(elapsed_ms, (int, float)) else None,
             raw=dict(data),
         )
+
+    @property
+    def is_queued(self) -> bool:
+        return self.phase == "queued"
+
+    @property
+    def is_preempted(self) -> bool:
+        return self.phase == "preempted"
 
     @property
     def is_error(self) -> bool:

@@ -21,6 +21,48 @@ void main() {
     expect(s.agentProviderId, 'gpt_research');
   });
 
+  test('ReachRunStatus.fromJson parses queued frame with queue fields', () {
+    final s = ReachRunStatus.fromJson({
+      'type': 'status',
+      'processing': true,
+      'phase': 'queued',
+      'message': 'Waiting in queue — position 2 of 5…',
+      'question_id': 'q1',
+      'run_id': 'r1',
+      'queuePhase': 'planning',
+      'queuePosition': 2,
+      'queueLength': 5,
+      'queuePriority': 100,
+      'queuePriorityLabel': 'realtime',
+      'elapsedMs': 4500.0,
+      'heartbeat': true,
+    });
+    expect(s.isQueued, isTrue);
+    expect(s.queuePhase, 'planning');
+    expect(s.queuePosition, 2);
+    expect(s.queueLength, 5);
+    expect(s.queuePriority, 100);
+    expect(s.queuePriorityLabel, 'realtime');
+    expect(s.elapsedMs, 4500.0);
+    expect(s.isError, isFalse);
+  });
+
+  test('ReachRunStatus.fromJson parses preempted terminal frame', () {
+    final s = ReachRunStatus.fromJson({
+      'type': 'status',
+      'processing': false,
+      'phase': 'preempted',
+      'message': 'Stopped to free capacity for a higher-priority request',
+      'code': 'queue_preempted',
+      'question_id': 'q2',
+      'run_id': 'r2',
+    });
+    expect(s.isPreempted, isTrue);
+    expect(s.processing, isFalse);
+    expect(s.code, 'queue_preempted');
+    expect(s.isError, isTrue);
+  });
+
   test('chat surfaces status callback and ReachRunException on failure', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() async => server.close(force: true));
