@@ -46,6 +46,7 @@ class ReachConnectionConfig:
     allowed_agent_provider_ids: list[str] | None = None
     allowed_mcp_provider_ids: list[str] | None = None
     allowed_skill_ids: list[str] | None = None
+    deploy_to_ao_sandbox: bool = False
 
     def __post_init__(self) -> None:
         self.app_id = normalize_reach_app_id(self.app_id)

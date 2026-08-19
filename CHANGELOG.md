@@ -4,7 +4,17 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
-## [0.13.0] - 2026-08-18
+### Added
+
+- **Custom-tool sandbox contract (v1)** — wheel+manifest zip bundle packaging
+  (`CustomToolManifest`, `ReachToolPackager` / `tool_packager`), AO sandbox deploy
+  client (`ReachSandboxDeployClient` / `sandbox_deploy_client`), and
+  `HybridSessionMcpBootstrap` (sandbox-first with tunnel fallback). Opt-in via
+  `ReachConnectionConfig.deployToAoSandbox` / `deploy_to_ao_sandbox` (default false).
+- **Mock client profiles** — `mock-comstar`, `mock-continue`, `mock-ha` with fictional
+  `client.*` tool IDs for e2e harnesses; `python/ao_reach/mock_client_runner.py` CLI
+  for edge smoke.
+
 
 ### Changed
 

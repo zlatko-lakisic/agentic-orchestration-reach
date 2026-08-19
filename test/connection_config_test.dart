@@ -22,6 +22,15 @@ void main() {
     );
   });
 
+  test('deployToAoSandbox defaults false', () {
+    final cfg = ReachConnectionConfig(
+      baseUrl: 'http://localhost:8765',
+      headers: const {},
+      appId: 'mock-comstar',
+    );
+    expect(cfg.deployToAoSandbox, isFalse);
+  });
+
   test('invalid appId is rejected', () {
     expect(
       () => ReachConnectionConfig(

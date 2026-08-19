@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    from .connection_config import ReachConnectionConfig
     from .local_mcp_host import LocalMcpHost
 
 
@@ -21,12 +22,20 @@ class SessionMcpBootstrapResult:
 
 class SessionMcpBootstrap(Protocol):
     async def prepare(
-        self, host: LocalMcpHost, *, mcp_tunnel: bool
+        self,
+        host: LocalMcpHost,
+        *,
+        mcp_tunnel: bool,
+        config: ReachConnectionConfig | None = None,
     ) -> SessionMcpBootstrapResult: ...
 
 
 class EmptySessionMcpBootstrap:
     async def prepare(
-        self, host: LocalMcpHost, *, mcp_tunnel: bool
+        self,
+        host: LocalMcpHost,
+        *,
+        mcp_tunnel: bool,
+        config: ReachConnectionConfig | None = None,
     ) -> SessionMcpBootstrapResult:
         return SessionMcpBootstrapResult()

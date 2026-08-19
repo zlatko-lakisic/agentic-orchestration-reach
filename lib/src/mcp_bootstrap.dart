@@ -1,5 +1,7 @@
 import 'local_mcp_host.dart';
 
+import 'connection_config.dart';
+
 /// Product-supplied preparation of local MCP processes + overlay MCP entries.
 ///
 /// Reach starts the WebSocket and registers agents; apps decide which client
@@ -8,6 +10,8 @@ abstract class SessionMcpBootstrap {
   Future<SessionMcpBootstrapResult> prepare(
     LocalMcpHost host, {
     required bool mcpTunnel,
+    ReachConnectionConfig? config,
+    bool customToolSandbox = false,
   });
 }
 
@@ -46,6 +50,8 @@ class EmptySessionMcpBootstrap implements SessionMcpBootstrap {
   Future<SessionMcpBootstrapResult> prepare(
     LocalMcpHost host, {
     required bool mcpTunnel,
+    ReachConnectionConfig? config,
+    bool customToolSandbox = false,
   }) async =>
       SessionMcpBootstrapResult.empty;
 }

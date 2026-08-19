@@ -49,6 +49,7 @@ class ReachConnectionConfig {
     this.allowedAgentProviderIds,
     this.allowedMcpProviderIds,
     this.allowedSkillIds,
+    this.deployToAoSandbox = false,
   }) : appId = normalizeReachAppId(appId);
 
   /// HTTP(S) base URL of the AO engine (e.g. `https://ao-host:8765`).
@@ -111,6 +112,10 @@ class ReachConnectionConfig {
   /// Optional stock skill allowlist for this session (``client.*`` always kept).
   final List<String>? allowedSkillIds;
 
+  /// When true, [HybridSessionMcpBootstrap] attempts AO sandbox deploy before tunnel.
+  /// Default false — existing tunnel-only overlays unchanged.
+  final bool deployToAoSandbox;
+
   ReachConnectionConfig copyWith({
     String? baseUrl,
     Map<String, String>? headers,
@@ -129,6 +134,7 @@ class ReachConnectionConfig {
     List<String>? allowedAgentProviderIds,
     List<String>? allowedMcpProviderIds,
     List<String>? allowedSkillIds,
+    bool? deployToAoSandbox,
   }) {
     return ReachConnectionConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -151,6 +157,7 @@ class ReachConnectionConfig {
           allowedAgentProviderIds ?? this.allowedAgentProviderIds,
       allowedMcpProviderIds: allowedMcpProviderIds ?? this.allowedMcpProviderIds,
       allowedSkillIds: allowedSkillIds ?? this.allowedSkillIds,
+      deployToAoSandbox: deployToAoSandbox ?? this.deployToAoSandbox,
     );
   }
 }

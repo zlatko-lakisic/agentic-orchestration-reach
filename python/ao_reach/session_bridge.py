@@ -69,6 +69,7 @@ class SessionBridge:
         self.error: str | None = None
         self.session_overlay = False
         self.mcp_tunnel = False
+        self.custom_tool_sandbox = False
         self.speech: SpeechCapabilities | None = None
         self.registered_agent_ids: list[str] = []
         self.registered_mcp_ids: list[str] = []
@@ -199,6 +200,7 @@ class SessionBridge:
         self._hello_wait = None
         self.session_overlay = bool(hello.get("sessionOverlay"))
         self.mcp_tunnel = bool(hello.get("mcpTunnel"))
+        self.custom_tool_sandbox = bool(hello.get("customToolSandbox"))
         if not self.session_overlay:
             raise RuntimeError(
                 "AO session overlay disabled — set AGENTIC_SERVE_SESSION_OVERLAY=1"
@@ -217,7 +219,14 @@ class SessionBridge:
                 speech_token=config.speech_token,
             )
 
-        boot = await mcp_bootstrap.prepare(self._mcp_host, mcp_tunnel=self.mcp_tunnel)
+        from .hybrid_mcp_bootstrap import HybridSessionMcpBootstrap
+
+        if isinstance(mcp_bootstrap, HybridSessionMcpBootstrap):
+            mcp_bootstrap.ao_custom_tool_sandbox = self.custom_tool_sandbox
+
+        boot = await mcp_bootstrap.prepare(
+            self._mcp_host, mcp_tunnel=self.mcp_tunnel, config=config
+        )
         self.client_mcp_warnings = list(boot.warnings)
         self.active_tunnel_bare_ids = list(boot.active_tunnel_bare_ids)
 
@@ -273,7 +282,7 @@ class SessionBridge:
         if not self.is_active or not self._last_config or not self._last_overlay_root:
             raise RuntimeError("Session bridge is not active")
         boot = await self._last_bootstrap.prepare(
-            self._mcp_host, mcp_tunnel=self.mcp_tunnel
+            self._mcp_host, mcp_tunnel=self.mcp_tunnel, config=self._last_config
         )
         pack = self._packer.pack(self._last_overlay_root, extra_mcps=boot.mcps)
         self._ack_wait = asyncio.get_event_loop().create_future()

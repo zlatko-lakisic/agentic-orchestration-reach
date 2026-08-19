@@ -10,6 +10,8 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
+  archive: ^4.0.0
+  crypto: ^3.0.0
   http: ^1.2.0
   path: ^1.9.0
   web_socket_channel: ^3.0.0

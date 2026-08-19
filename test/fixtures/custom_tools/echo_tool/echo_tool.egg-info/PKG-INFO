@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: echo-tool
+Version: 0.1.0
+Summary: Minimal echo MCP shim for Reach custom-tool contract tests
+Requires-Python: >=3.11

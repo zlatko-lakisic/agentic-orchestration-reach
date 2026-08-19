@@ -80,6 +80,8 @@ class _StaticBootstrap implements SessionMcpBootstrap {
   Future<SessionMcpBootstrapResult> prepare(
     LocalMcpHost host, {
     required bool mcpTunnel,
+    ReachConnectionConfig? config,
+    bool customToolSandbox = false,
   }) async =>
       result;
 }

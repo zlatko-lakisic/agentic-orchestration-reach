@@ -1,0 +1,8 @@
+pyproject.toml
+echo_tool/__init__.py
+echo_tool/mcp.py
+echo_tool.egg-info/PKG-INFO
+echo_tool.egg-info/SOURCES.txt
+echo_tool.egg-info/dependency_links.txt
+echo_tool.egg-info/entry_points.txt
+echo_tool.egg-info/top_level.txt

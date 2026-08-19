@@ -63,6 +63,7 @@ class SessionBridge {
   String? error;
   bool sessionOverlay = false;
   bool mcpTunnel = false;
+  bool customToolSandbox = false;
   SpeechCapabilities? speech;
   List<String> registeredAgentIds = const [];
   List<String> registeredMcpIds = const [];
@@ -366,6 +367,7 @@ class SessionBridge {
     }
     sessionOverlay = hello['sessionOverlay'] == true;
     mcpTunnel = hello['mcpTunnel'] == true;
+    customToolSandbox = hello['customToolSandbox'] == true;
     _disposeSpeechClient();
     speech = SpeechCapabilities.tryParse(hello['speech']);
     if (speech != null) {
@@ -387,7 +389,12 @@ class SessionBridge {
       );
     }
 
-    final boot = await mcpBootstrap.prepare(_mcpHost, mcpTunnel: mcpTunnel);
+    final boot = await mcpBootstrap.prepare(
+      _mcpHost,
+      mcpTunnel: mcpTunnel,
+      config: config,
+      customToolSandbox: customToolSandbox,
+    );
     if (boot.mcps.isNotEmpty && !mcpTunnel) {
       final needsTunnel = boot.mcps.any((m) {
         final http = m['streamable_http'];
