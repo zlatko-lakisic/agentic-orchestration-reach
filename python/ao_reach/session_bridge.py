@@ -324,6 +324,8 @@ class SessionBridge:
         priority: str | int | None = None,
         mcp_provider_ids: list[str] | None = None,
         images: list[dict[str, Any]] | None = None,
+        response_format: dict[str, Any] | None = None,
+        json_schema: dict[str, Any] | None = None,
         on_status: Callable[[ReachRunStatus], None] | None = None,
         timeout: float = 300.0,
     ) -> dict[str, Any]:
@@ -332,6 +334,17 @@ class SessionBridge:
         Optional ``images`` — ``[{mimeType, dataBase64, name?}, ...]`` in display
         order. AO routes those turns to a vision model; engines that predate the
         multimodal protocol ignore the field and answer from ``text`` alone.
+
+        Optional ``response_format={"type": "json_object"}`` selects the engine's
+        JSON mode (engine >= 1.25.0), which is a different pipeline rather than a
+        hint: it skips the crew and the user-facing prose sanitizer, and asks the
+        provider for native structured output. That matters for a machine consumer,
+        because the sanitizer exists to make an answer speakable — it unwraps a JSON
+        object to the one field a voice assistant should read aloud, so a caller that
+        wanted the object gets a single value out of it instead. Pass ``json_schema``
+        as well to constrain decoding and have the engine validate before replying;
+        a response that does not parse or does not conform ends the run with an
+        error rather than a plausible-looking wrong answer.
         """
         if not self.is_active or self._ws is None:
             raise RuntimeError("Session bridge is not active — cannot run client.* agents")
@@ -357,6 +370,10 @@ class SessionBridge:
             payload["mcpProviderIds"] = mcp_provider_ids
         if images:
             payload["images"] = list(images)
+        if response_format:
+            payload["responseFormat"] = dict(response_format)
+        if json_schema:
+            payload["jsonSchema"] = dict(json_schema)
         if priority is not None:
             payload["priority"] = priority
         await self._send(payload)
