@@ -226,8 +226,37 @@ class LocalMcpHost:
 
 
 def _shell_quote(arg: str) -> str:
+    """Quote one argument for the shell mcp-proxy will hand the command to.
+
+    Which shell that is depends on the platform: mcp-proxy spawns with Node's
+    `shell: true`, so POSIX gets `/bin/sh` and Windows gets `cmd.exe` via ComSpec.
+    The two disagree about quoting, and cmd.exe has no concept of a single-quoted
+    string at all — it passes `'C:\\...\\python.exe'` through as a literal filename,
+    quotes included, and the spawn dies with "The filename, directory name, or
+    volume label syntax is incorrect".
+
+    Every Windows path contains a backslash, which is not in the unquoted-safe set,
+    so POSIX quoting made *every* stdio MCP on Windows fail to start this way.
+    """
+    if os.name == "nt":
+        return _cmd_quote(arg)
+    return _posix_quote(arg)
+
+
+def _posix_quote(arg: str) -> str:
     if not arg:
         return "''"
     if all(c.isalnum() or c in "@%_+-=:,./" for c in arg):
         return arg
     return "'" + arg.replace("'", "'\"'\"'") + "'"
+
+
+def _cmd_quote(arg: str) -> str:
+    """Quote for cmd.exe: double quotes, and a literal `"` is doubled inside them."""
+    if not arg:
+        return '""'
+    # Backslash is safe unquoted here and belongs in the set: a bare Windows path
+    # with no spaces needs no quoting, which keeps the common case readable in logs.
+    if all(c.isalnum() or c in "@_+-=:,./\\" for c in arg):
+        return arg
+    return '"' + arg.replace('"', '""') + '"'
