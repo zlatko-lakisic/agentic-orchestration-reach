@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,8 @@ from .mcp_session_spec import (
     McpSessionTransport,
     session_tunnel_mcp_entry,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -191,7 +194,6 @@ class OverlayPacker:
             skill = skill_by_bare.get(bare)
             if skill is None:
                 continue
-            client_ids.append(to_client_agent_id(bare))
             inject = skill.get("inject")
             heading = (
                 inject.get("heading")
@@ -202,7 +204,17 @@ class OverlayPacker:
             body = content.get("body") if isinstance(content, dict) else ""
             body = str(body or "")
             if not body.strip():
+                # Referencing it anyway costs the agent everything: the engine validates
+                # each named skill and rejects the whole request with "missing 'content'
+                # mapping", so a skill that contributes nothing would silently take the
+                # agent down with it.
+                _LOGGER.warning(
+                    "skill %s has no content body — not attaching it to agent %s",
+                    bare,
+                    agent.get("id") or "?",
+                )
                 continue
+            client_ids.append(to_client_agent_id(bare))
             chunks.append(f"{heading}\n\n{body.strip()}")
         agent["skills"] = client_ids
         if not chunks:

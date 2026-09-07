@@ -4,6 +4,13 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Fixed
+
+- **A skill with no `content` body is no longer named on the agent.** The engine
+  validates every referenced skill and rejects the whole request when one has no body,
+  so an agent that named it was refused before any model ran. The skip is now logged
+  instead of silent.
+
 ## [0.15.0] - 2026-08-19
 
 ### Added
