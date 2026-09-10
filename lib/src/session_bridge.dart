@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'connection_config.dart';
 import 'ids.dart';
+import 'agent_state.dart';
 import 'local_mcp_host.dart';
 import 'mcp_bootstrap.dart';
 import 'mtls.dart';
@@ -71,6 +72,9 @@ class SessionBridge {
   bool filesystemMcpActive = false;
   bool emailGmailMcpActive = false;
   bool calendarGoogleMcpActive = false;
+  bool agentStateCapability = false;
+  final Map<String, AgentLifecycleState> agentStates = {};
+  final Map<String, AgentStateUpdate> agentStateMeta = {};
 
   /// Bare ids of Tools MCPs successfully started as stdio tunnels this session.
   List<String> activeTunnelBareIds = const [];
@@ -95,6 +99,11 @@ class SessionBridge {
   /// All in-flight chat / directAgent status frames (demux with [ReachRunStatus.questionId]).
   Stream<ReachRunStatus> get runStatusUpdates => _runStatusController.stream;
 
+  final _agentStateController = StreamController<AgentStateUpdate>.broadcast();
+
+  /// Per-agent lifecycle frames (`type: agent_state`), including [AgentLifecycleState.pulling].
+  Stream<AgentStateUpdate> get agentStateUpdates => _agentStateController.stream;
+
   bool get isActive => state == SessionBridgeState.active;
   String? get filesystemMcpId => filesystemMcpActive ? clientFilesystemMcpId : null;
   String? get emailGmailMcpId => emailGmailMcpActive ? clientEmailGmailMcpId : null;
@@ -105,6 +114,40 @@ class SessionBridge {
 
   /// Non-null when the remote AO advertised speech sidecars on `hello`.
   SpeechClient? get speechClient => _speechClient;
+
+  AgentLifecycleState? agentState(String agentProviderId) =>
+      agentStates[agentProviderId.trim()];
+
+  /// Wait until [agentProviderId] reaches one of [states].
+  Future<AgentStateUpdate> waitForAgentState(
+    String agentProviderId, {
+    required Set<AgentLifecycleState> states,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    final pid = agentProviderId.trim();
+    if (pid.isEmpty || states.isEmpty) {
+      throw ArgumentError('agentProviderId and states are required');
+    }
+    final current = agentStates[pid];
+    if (current != null && states.contains(current)) {
+      return agentStateMeta[pid] ??
+          AgentStateUpdate(agentProviderId: pid, state: current);
+    }
+    return agentStateUpdates
+        .where((u) => u.agentProviderId == pid && states.contains(u.state))
+        .first
+        .timeout(timeout);
+  }
+
+  void _setAgentState(AgentStateUpdate update) {
+    if (update.agentProviderId.isEmpty) return;
+    agentStates[update.agentProviderId] = update.state;
+    agentStateMeta[update.agentProviderId] = update;
+    if (!_agentStateController.isClosed) {
+      _agentStateController.add(update);
+    }
+    _emit();
+  }
 
   /// Run `direct_agent` on the owning session WebSocket.
   ///
@@ -152,10 +195,21 @@ class SessionBridge {
       if (images != null && images.isNotEmpty) 'images': images,
       if (priority != null) 'priority': priority,
     });
+    _setAgentState(
+      AgentStateUpdate(
+        agentProviderId: agentProviderId,
+        state: AgentLifecycleState.busy,
+        reason: 'direct_agent',
+        questionId: qid,
+      ),
+    );
     try {
       return await pending.done.future.timeout(timeout);
     } on TimeoutException {
       _pendingRuns.remove(qid);
+      try {
+        cancel(qid);
+      } catch (_) {}
       throw TimeoutException('direct_agent timed out for $agentProviderId ($qid)');
     }
   }
@@ -214,6 +268,9 @@ class SessionBridge {
       return await pending.done.future.timeout(timeout);
     } on TimeoutException {
       _pendingRuns.remove(qid);
+      try {
+        cancel(qid);
+      } catch (_) {}
       throw TimeoutException('chat timed out ($qid)');
     }
   }
@@ -374,6 +431,7 @@ class SessionBridge {
     sessionOverlay = hello['sessionOverlay'] == true;
     mcpTunnel = hello['mcpTunnel'] == true;
     customToolSandbox = hello['customToolSandbox'] == true;
+    agentStateCapability = hello['agentState'] == true;
     _disposeSpeechClient();
     speech = SpeechCapabilities.tryParse(hello['speech']);
     if (speech != null) {
@@ -470,6 +528,17 @@ class SessionBridge {
 
     registeredAgentIds =
         ((ack['agentIds'] as List?) ?? pack.agentIds).map((e) => e.toString()).toList();
+    if (!agentStateCapability) {
+      for (final aid in registeredAgentIds) {
+        _setAgentState(
+          AgentStateUpdate(
+            agentProviderId: aid,
+            state: AgentLifecycleState.ready,
+            reason: 'overlay_ack',
+          ),
+        );
+      }
+    }
     if (ack.containsKey('mcpIds')) {
       registeredMcpIds =
           ((ack['mcpIds'] as List?) ?? const []).map((e) => e.toString()).toList();
@@ -587,6 +656,17 @@ class SessionBridge {
     }
     registeredAgentIds =
         ((ack['agentIds'] as List?) ?? pack.agentIds).map((e) => e.toString()).toList();
+    if (!agentStateCapability) {
+      for (final aid in registeredAgentIds) {
+        _setAgentState(
+          AgentStateUpdate(
+            agentProviderId: aid,
+            state: AgentLifecycleState.ready,
+            reason: 'overlay_ack',
+          ),
+        );
+      }
+    }
     if (ack.containsKey('mcpIds')) {
       registeredMcpIds =
           ((ack['mcpIds'] as List?) ?? const []).map((e) => e.toString()).toList();
@@ -702,6 +782,13 @@ class SessionBridge {
           }
         }
         _onRunStatus(msg);
+        break;
+      case 'agent_state':
+        try {
+          _setAgentState(AgentStateUpdate.fromJson(msg));
+        } on FormatException {
+          // ignore unknown states from future engines
+        }
         break;
       case 'run_start':
         _onRunStart(msg);
@@ -955,6 +1042,9 @@ class SessionBridge {
     calendarGoogleMcpActive = false;
     activeTunnelBareIds = const [];
     clientMcpWarnings = const [];
+    agentStates.clear();
+    agentStateMeta.clear();
+    agentStateCapability = false;
     speech = null;
     error = null;
     _reconnectAttempts = 0;
@@ -1011,6 +1101,7 @@ class SessionBridge {
     await stop(clearRemote: true);
     await _statusController.close();
     await _runStatusController.close();
+    await _agentStateController.close();
   }
 
   static WebSocketChannel _mtlsWsConnect(
