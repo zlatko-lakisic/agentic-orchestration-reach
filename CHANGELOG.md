@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-10
+
 ### Added
 
 - **`response_format` / `json_schema` on Python `direct_agent`** — reaches the engine's
