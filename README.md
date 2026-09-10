@@ -30,6 +30,48 @@ without closing the WebSocket or clearing the overlay. The engine replies with
 `status` / `run_end` using `code: cancelled`. Untagged busy runs cannot be
 cancelled this way — always send a `questionId`.
 
+Client wall-clock timeouts on `directAgent` / `chat` also send `cancel` so the
+engine does not keep holding Ollama leases after the app has given up.
+
+## Agent lifecycle state
+
+When AO advertises `agentState: true` on `hello`, the engine pushes sticky
+per-agent frames (`type: agent_state`) for each overlay agent id:
+
+| State | Meaning |
+|-------|---------|
+| `down` | Not usable |
+| `starting` | Overlay register / warm (non-pull) |
+| `pulling` | **Local Ollama only** — model download / ensure in progress |
+| `ready` | Idle and callable |
+| `busy` | A run is in flight |
+| `stopping` | Teardown / clear |
+
+`pulling` is a first-class **state** (not `starting` + reason). Optional
+`model` / `progress` / `detail` annotate the pull.
+
+```dart
+bridge.agentStateUpdates.listen((u) {
+  if (u.state == AgentLifecycleState.pulling) {
+    // Show “Pulling ${u.model}…”
+  }
+});
+
+await bridge.waitForAgentState(
+  'client.campaign_director',
+  states: {AgentLifecycleState.ready},
+  timeout: const Duration(minutes: 15),
+);
+```
+
+```python
+await bridge.wait_for_agent_state(
+    "client.campaign_director",
+    states={AgentLifecycleState.READY},
+    timeout=900,
+)
+```
+
 ## Install
 
 ```yaml
