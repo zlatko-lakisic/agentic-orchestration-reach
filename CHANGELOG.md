@@ -4,6 +4,24 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Added
+
+- **`response_format` / `json_schema` on Python `direct_agent`** — reaches the engine's
+  JSON mode (engine >= 1.25.0), which the Dart client could already ask for. The engine
+  treats it as a separate pipeline rather than a hint: no crew, no user-facing prose
+  sanitizer, and native structured output from the provider, with the schema validated
+  before the run ends. A machine consumer needs it. The sanitizer's job is to make an
+  answer speakable, so it unwraps a JSON object down to the one field a voice assistant
+  should read aloud — a caller that asked for the object was getting a single value out
+  of it.
+
+### Fixed
+
+- **A skill with no `content` body is no longer named on the agent.** The engine
+  validates every referenced skill and rejects the whole request when one has no body,
+  so an agent that named it was refused before any model ran. The skip is now logged
+  instead of silent.
+
 ## [0.16.0] - 2026-09-10
 
 ### Added

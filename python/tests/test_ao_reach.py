@@ -99,6 +99,37 @@ def test_direct_agent_sends_images_when_given() -> None:
     assert payload["images"] == [_image()]
 
 
+def test_direct_agent_asks_for_json_mode_when_given_a_response_format() -> None:
+    """The engine keys JSON mode off this field; without it the answer is sanitized prose."""
+    schema = {"type": "object", "required": ["objective"]}
+    payload = asyncio.run(
+        _capture_payload(
+            SessionBridge(),
+            lambda b: b.direct_agent(
+                agent_provider_id="client.campaign_director",
+                text="decide the turn",
+                response_format={"type": "json_object"},
+                json_schema=schema,
+            ),
+        )
+    )
+    assert payload["responseFormat"] == {"type": "json_object"}
+    assert payload["jsonSchema"] == schema
+
+
+def test_direct_agent_stays_on_the_prose_path_by_default() -> None:
+    payload = asyncio.run(
+        _capture_payload(
+            SessionBridge(),
+            lambda b: b.direct_agent(
+                agent_provider_id="client.narrator", text="one line about the siege"
+            ),
+        )
+    )
+    assert "responseFormat" not in payload
+    assert "jsonSchema" not in payload
+
+
 def test_chat_omits_images_when_absent_or_empty() -> None:
     without = asyncio.run(
         _capture_payload(SessionBridge(), lambda b: b.chat(text="why is the sky blue"))
