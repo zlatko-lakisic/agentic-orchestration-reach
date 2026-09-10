@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-10
+
 ### Added
 
 - **Per-agent lifecycle state** — `AgentLifecycleState` (`down` / `starting` /
