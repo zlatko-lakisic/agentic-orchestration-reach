@@ -22,6 +22,22 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
   so an agent that named it was refused before any model ran. The skip is now logged
   instead of silent.
 
+## [0.16.0] - 2026-09-10
+
+### Added
+
+- **Per-agent lifecycle state** — `AgentLifecycleState` (`down` / `starting` /
+  `pulling` / `ready` / `busy` / `stopping`) with `agentStateUpdates` /
+  `on_agent_state` and `waitForAgentState` / `wait_for_agent_state`. `pulling` is
+  first-class for local Ollama model downloads (not a reason under `starting`).
+  Engine advertises `agentState: true` on hello.
+
+### Changed
+
+- **Cancel on client timeout** — when `directAgent` / `chat` / `direct_agent`
+  wall-clock timeout fires, Reach now sends `cancel` for that `questionId` so the
+  engine releases leases instead of leaving work running.
+
 ## [0.15.0] - 2026-08-19
 
 ### Added

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import json
 import logging
 import re
@@ -15,6 +16,7 @@ from typing import Any, Callable
 
 import aiohttp
 
+from .agent_state import AgentLifecycleState, AgentStateUpdate
 from .connection_config import ReachConnectionConfig, reach_ws_uri
 from .local_mcp_host import LocalMcpHost
 from .mcp_bootstrap import EmptySessionMcpBootstrap, SessionMcpBootstrap
@@ -77,12 +79,17 @@ class SessionBridge:
         self.active_tunnel_bare_ids: list[str] = []
         self.client_mcp_warnings: list[str] = []
         self.register_progress: str | None = None
+        self.agent_state_capability = False
+        self.agent_states: dict[str, AgentLifecycleState] = {}
+        self.agent_state_meta: dict[str, AgentStateUpdate] = {}
 
         self._last_config: ReachConnectionConfig | None = None
         self._last_overlay_root: str | None = None
         self._last_bootstrap: SessionMcpBootstrap = EmptySessionMcpBootstrap()
         self._status_callbacks: list[Callable[[SessionBridge], None]] = []
         self._run_status_callbacks: list[Callable[[ReachRunStatus], None]] = []
+        self._agent_state_callbacks: list[Callable[[AgentStateUpdate], None]] = []
+        self._agent_state_waiters: list[tuple[str, set[AgentLifecycleState], asyncio.Future]] = []
 
     @property
     def is_active(self) -> bool:
@@ -102,6 +109,58 @@ class SessionBridge:
     def on_run_status(self, callback: Callable[[ReachRunStatus], None]) -> None:
         """Listen for all chat / direct_agent status frames (demux via question_id)."""
         self._run_status_callbacks.append(callback)
+
+    def on_agent_state(self, callback: Callable[[AgentStateUpdate], None]) -> None:
+        """Listen for per-agent lifecycle frames (`type: agent_state`)."""
+        self._agent_state_callbacks.append(callback)
+
+    def agent_state(self, agent_provider_id: str) -> AgentLifecycleState | None:
+        return self.agent_states.get(str(agent_provider_id or "").strip())
+
+    async def wait_for_agent_state(
+        self,
+        agent_provider_id: str,
+        *,
+        states: set[AgentLifecycleState] | list[AgentLifecycleState],
+        timeout: float = 600.0,
+    ) -> AgentStateUpdate:
+        """Block until ``agent_provider_id`` reaches one of ``states``."""
+        pid = str(agent_provider_id or "").strip()
+        wanted = set(states)
+        if not pid or not wanted:
+            raise ValueError("agent_provider_id and states are required")
+        current = self.agent_states.get(pid)
+        if current in wanted:
+            meta = self.agent_state_meta.get(pid)
+            if meta is not None:
+                return meta
+            return AgentStateUpdate(agent_provider_id=pid, state=current)
+        loop = asyncio.get_event_loop()
+        fut: asyncio.Future = loop.create_future()
+        self._agent_state_waiters.append((pid, wanted, fut))
+        try:
+            return await asyncio.wait_for(fut, timeout=timeout)
+        finally:
+            self._agent_state_waiters = [
+                w for w in self._agent_state_waiters if w[2] is not fut
+            ]
+
+    def _set_agent_state(self, update: AgentStateUpdate) -> None:
+        if not update.agent_provider_id:
+            return
+        self.agent_states[update.agent_provider_id] = update.state
+        self.agent_state_meta[update.agent_provider_id] = update
+        for cb in list(self._agent_state_callbacks):
+            try:
+                cb(update)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("agent state callback failed")
+        pending = list(self._agent_state_waiters)
+        for pid, wanted, fut in pending:
+            if fut.done():
+                continue
+            if pid == update.agent_provider_id and update.state in wanted:
+                fut.set_result(update)
 
     def _emit(self) -> None:
         for cb in list(self._status_callbacks):
@@ -201,6 +260,7 @@ class SessionBridge:
         self.session_overlay = bool(hello.get("sessionOverlay"))
         self.mcp_tunnel = bool(hello.get("mcpTunnel"))
         self.custom_tool_sandbox = bool(hello.get("customToolSandbox"))
+        self.agent_state_capability = bool(hello.get("agentState"))
         if not self.session_overlay:
             raise RuntimeError(
                 "AO session overlay disabled — set AGENTIC_SERVE_SESSION_OVERLAY=1"
@@ -248,15 +308,46 @@ class SessionBridge:
             payload["allowedMcpProviderIds"] = list(config.allowed_mcp_provider_ids)
         if config.allowed_skill_ids:
             payload["allowedSkillIds"] = list(config.allowed_skill_ids)
+        for agent in pack.agents:
+            aid = str((agent or {}).get("id") or "").strip()
+            if aid and not self.agent_state_capability:
+                self._set_agent_state(
+                    AgentStateUpdate(
+                        agent_provider_id=aid,
+                        state=AgentLifecycleState.STARTING,
+                        reason="overlay_register",
+                    )
+                )
         await self._send(payload)
         ack = await asyncio.wait_for(self._ack_wait, timeout=600)
         self._ack_wait = None
         if ack.get("type") == "session_overlay_denied" or ack.get("type") == "error":
+            for agent in pack.agents:
+                aid = str((agent or {}).get("id") or "").strip()
+                if aid and not self.agent_state_capability:
+                    self._set_agent_state(
+                        AgentStateUpdate(
+                            agent_provider_id=aid,
+                            state=AgentLifecycleState.DOWN,
+                            reason="overlay_denied",
+                            detail=str(ack.get("message") or ""),
+                        )
+                    )
             raise RuntimeError(
                 ack.get("message") or ack.get("reason") or "session_overlay_denied"
             )
         self.registered_agent_ids = list(ack.get("agentIds") or pack.agent_ids)
         self.registered_mcp_ids = list(ack.get("mcpIds") or pack.mcp_ids)
+        if not self.agent_state_capability:
+            for aid in self.registered_agent_ids:
+                if aid:
+                    self._set_agent_state(
+                        AgentStateUpdate(
+                            agent_provider_id=str(aid),
+                            state=AgentLifecycleState.READY,
+                            reason="overlay_ack",
+                        )
+                    )
         exp = ack.get("expiresAt")
         self.expires_at = float(exp) if isinstance(exp, (int, float)) else None
         self.state = SessionBridgeState.ACTIVE
@@ -377,10 +468,20 @@ class SessionBridge:
         if priority is not None:
             payload["priority"] = priority
         await self._send(payload)
+        self._set_agent_state(
+            AgentStateUpdate(
+                agent_provider_id=agent_provider_id,
+                state=AgentLifecycleState.BUSY,
+                reason="direct_agent",
+                question_id=qid,
+            )
+        )
         try:
             return await asyncio.wait_for(pending.done, timeout=timeout)
         except TimeoutError:
             self._pending_runs.pop(qid, None)
+            with contextlib.suppress(Exception):
+                await self.cancel(qid)
             raise TimeoutError(f"direct_agent timed out for {agent_provider_id} ({qid})") from None
 
     async def chat(
@@ -434,6 +535,8 @@ class SessionBridge:
             return await asyncio.wait_for(pending.done, timeout=timeout)
         except TimeoutError:
             self._pending_runs.pop(qid, None)
+            with contextlib.suppress(Exception):
+                await self.cancel(qid)
             raise TimeoutError(f"chat timed out ({qid})") from None
 
     async def cancel(self, question_id: str) -> None:
@@ -534,6 +637,13 @@ class SessionBridge:
                     self.register_progress = msg_text
                     self._emit()
             self._on_run_status(msg)
+        elif typ == "agent_state":
+            try:
+                update = AgentStateUpdate.from_json(msg)
+            except ValueError:
+                return
+            self._set_agent_state(update)
+            self._emit()
         elif typ == "run_start":
             self._on_run_start(msg)
         elif typ == "run_end":

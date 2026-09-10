@@ -6,9 +6,11 @@ heavy deps like aiohttp during Home Assistant config-flow discovery.
 
 from __future__ import annotations
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 __all__ = [
+    "AgentLifecycleState",
+    "AgentStateUpdate",
     "EmptySessionMcpBootstrap",
     "LocalMcpHost",
     "McpSessionSpec",
@@ -46,6 +48,8 @@ __all__ = [
 def __getattr__(name: str):
     """Lazy attribute access so light imports stay dependency-free."""
     mapping = {
+        "AgentLifecycleState": (".agent_state", "AgentLifecycleState"),
+        "AgentStateUpdate": (".agent_state", "AgentStateUpdate"),
         "ReachCatalog": (".catalog_client", "ReachCatalog"),
         "ReachCatalogClient": (".catalog_client", "ReachCatalogClient"),
         "ReachCatalogEntry": (".catalog_client", "ReachCatalogEntry"),
