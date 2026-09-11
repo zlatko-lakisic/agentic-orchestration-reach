@@ -28,3 +28,18 @@ def test_pulling_is_first_class_state() -> None:
 def test_unknown_state_rejected() -> None:
     with pytest.raises(ValueError):
         AgentStateUpdate.from_json({"agentProviderId": "a", "state": "warming"})
+
+
+@pytest.mark.unit
+def test_loading_is_first_class_state() -> None:
+    update = AgentStateUpdate.from_json(
+        {
+            "type": "agent_state",
+            "agentProviderId": "client.campaign_director",
+            "state": "loading",
+            "model": "qwen3.5:4b",
+            "reason": "vram_warmup",
+        }
+    )
+    assert update.state is AgentLifecycleState.LOADING
+    assert update.state.value == "loading"

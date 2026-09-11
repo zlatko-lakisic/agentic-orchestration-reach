@@ -4,11 +4,12 @@ library;
 /// Sticky per-agent readiness on a Reach session.
 ///
 /// [pulling] is first-class (not a reason under [starting]) and is used only
-/// for local Ollama ensure/pull.
+/// for local Ollama ensure/pull. [loading] is optional VRAM warmup before [ready].
 enum AgentLifecycleState {
   down,
   starting,
   pulling,
+  loading,
   ready,
   busy,
   stopping,
@@ -22,6 +23,8 @@ AgentLifecycleState? parseAgentLifecycleState(String? raw) {
       return AgentLifecycleState.starting;
     case 'pulling':
       return AgentLifecycleState.pulling;
+    case 'loading':
+      return AgentLifecycleState.loading;
     case 'ready':
       return AgentLifecycleState.ready;
     case 'busy':
@@ -41,6 +44,8 @@ String agentLifecycleStateWire(AgentLifecycleState state) {
       return 'starting';
     case AgentLifecycleState.pulling:
       return 'pulling';
+    case AgentLifecycleState.loading:
+      return 'loading';
     case AgentLifecycleState.ready:
       return 'ready';
     case AgentLifecycleState.busy:

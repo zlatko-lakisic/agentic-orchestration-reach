@@ -20,9 +20,22 @@ void main() {
     expect(parseAgentLifecycleState('down'), AgentLifecycleState.down);
     expect(parseAgentLifecycleState('starting'), AgentLifecycleState.starting);
     expect(parseAgentLifecycleState('pulling'), AgentLifecycleState.pulling);
+    expect(parseAgentLifecycleState('loading'), AgentLifecycleState.loading);
     expect(parseAgentLifecycleState('ready'), AgentLifecycleState.ready);
     expect(parseAgentLifecycleState('busy'), AgentLifecycleState.busy);
     expect(parseAgentLifecycleState('stopping'), AgentLifecycleState.stopping);
     expect(parseAgentLifecycleState('nope'), isNull);
+  });
+
+  test('AgentLifecycleState.loading is first-class on the wire', () {
+    final update = AgentStateUpdate.fromJson({
+      'type': 'agent_state',
+      'agentProviderId': 'client.campaign_director',
+      'state': 'loading',
+      'model': 'qwen3.5:4b',
+      'reason': 'vram_warmup',
+    });
+    expect(update.state, AgentLifecycleState.loading);
+    expect(agentLifecycleStateWire(update.state), 'loading');
   });
 }

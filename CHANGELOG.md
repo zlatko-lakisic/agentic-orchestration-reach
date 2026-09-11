@@ -4,6 +4,12 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Added
+
+- **`loading` agent lifecycle state** — optional VRAM warmup between `pulling` and
+  `ready` (AO overlay prewarm). Dart + Python `AgentLifecycleState` include
+  `loading` so `waitForAgentState` / parsers accept it.
+
 ## [0.17.0] - 2026-09-10
 
 ### Added
