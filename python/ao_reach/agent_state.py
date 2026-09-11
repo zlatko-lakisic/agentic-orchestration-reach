@@ -11,12 +11,13 @@ class AgentLifecycleState(str, Enum):
     """Sticky per-agent readiness on a Reach session.
 
     ``PULLING`` is first-class (not a reason under ``STARTING``) and is used only
-    for local Ollama ensure/pull.
+    for local Ollama ensure/pull. ``LOADING`` is optional VRAM warmup before ``READY``.
     """
 
     DOWN = "down"
     STARTING = "starting"
     PULLING = "pulling"
+    LOADING = "loading"
     READY = "ready"
     BUSY = "busy"
     STOPPING = "stopping"
