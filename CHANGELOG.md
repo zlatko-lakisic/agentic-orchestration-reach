@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-10
+
 ### Added
 
 - **`loading` agent lifecycle state** — optional VRAM warmup between `pulling` and
