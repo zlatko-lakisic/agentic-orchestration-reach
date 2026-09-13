@@ -4,6 +4,13 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Changed
+
+- **Overlay packer for `type: object_detection`** — force `selfcontained: false`;
+  rewrite client-local `weights.uri` (`file://` / absolute paths) to
+  `artifact://<sha256>` so the engine owns weight fetch/cache (mirrors Ollama
+  host stripping).
+
 ## [0.18.0] - 2026-09-10
 
 ### Added

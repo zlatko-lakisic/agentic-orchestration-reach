@@ -79,9 +79,30 @@ class OverlayPacker {
         out[key] = value;
       });
       out['id'] = toClientAgentId(bareId);
-      if ((out['type']?.toString() ?? '').toLowerCase() == 'ollama') {
+      final ptype = (out['type']?.toString() ?? '').toLowerCase();
+      if (ptype == 'ollama') {
         out.remove('ollama_host');
         out['selfcontained'] = false;
+      } else if (ptype == 'object_detection') {
+        out['selfcontained'] = false;
+        final weights = out['weights'];
+        if (weights is Map) {
+          final uri = (weights['uri'] ?? '').toString().trim();
+          final lower = uri.toLowerCase();
+          if (lower.startsWith('file:') ||
+              lower.startsWith('/') ||
+              (uri.length > 1 && uri[1] == ':')) {
+            final cleaned = Map<String, dynamic>.from(
+              weights.map((k, v) => MapEntry(k.toString(), v)),
+            );
+            final digest = (cleaned['sha256'] ?? '').toString().trim();
+            cleaned.remove('uri');
+            if (digest.isNotEmpty) {
+              cleaned['uri'] = 'artifact://$digest';
+            }
+            out['weights'] = cleaned;
+          }
+        }
       }
       _attachSkillsToAgent(out, skillByBare);
       agents.add(out);

@@ -153,6 +153,34 @@ def test_chat_sends_images_when_given() -> None:
     assert len(payload["images"]) == 2
 
 
+def test_overlay_packer_object_detection(tmp_path: Path) -> None:
+    agents = tmp_path / "agent_providers"
+    agents.mkdir()
+    (agents / "det.yaml").write_text(
+        yaml.dump(
+            {
+                "id": "ui_detect",
+                "type": "object_detection",
+                "selfcontained": True,
+                "weights": {
+                    "uri": "file:///tmp/client-local.onnx",
+                    "sha256": "ab" * 32,
+                    "format": "onnx",
+                },
+                "role": "Det",
+                "goal": "g",
+                "backstory": "b",
+            }
+        ),
+        encoding="utf-8",
+    )
+    pack = OverlayPacker().pack(tmp_path)
+    assert pack.agents[0]["id"] == "client.ui_detect"
+    assert pack.agents[0]["selfcontained"] is False
+    assert pack.agents[0]["weights"]["uri"] == "artifact://" + ("ab" * 32)
+    assert pack.agents[0]["weights"]["sha256"] == "ab" * 32
+
+
 def test_overlay_packer(tmp_path: Path) -> None:
     agents = tmp_path / "agent_providers"
     skills = tmp_path / "agent_skills"
