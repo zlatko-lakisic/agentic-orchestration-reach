@@ -80,9 +80,27 @@ class OverlayPacker:
                 continue
             out = dict(raw)
             out["id"] = to_client_agent_id(bare_id)
-            if str(out.get("type") or "").lower() == "ollama":
+            ptype = str(out.get("type") or "").lower()
+            if ptype == "ollama":
                 out.pop("ollama_host", None)
                 out["selfcontained"] = False
+            elif ptype == "object_detection":
+                # Engine owns weight fetch/cache; never spawn client-local runtimes.
+                out["selfcontained"] = False
+                weights = out.get("weights")
+                if isinstance(weights, dict):
+                    uri = str(weights.get("uri") or "").strip()
+                    lower = uri.lower()
+                    if lower.startswith("file:") or lower.startswith("/") or (
+                        len(uri) > 1 and uri[1] == ":"
+                    ):
+                        # Drop client-local paths; keep sha256 so engine can resolve cache.
+                        weights = dict(weights)
+                        digest = str(weights.get("sha256") or "").strip()
+                        weights.pop("uri", None)
+                        if digest:
+                            weights["uri"] = f"artifact://{digest}"
+                        out["weights"] = weights
             self._attach_skills_to_agent(out, skill_by_bare)
             agents.append(out)
 

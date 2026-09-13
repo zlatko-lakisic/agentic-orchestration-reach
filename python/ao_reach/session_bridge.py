@@ -426,16 +426,9 @@ class SessionBridge:
         order. AO routes those turns to a vision model; engines that predate the
         multimodal protocol ignore the field and answer from ``text`` alone.
 
-        Optional ``response_format={"type": "json_object"}`` selects the engine's
-        JSON mode (engine >= 1.25.0), which is a different pipeline rather than a
-        hint: it skips the crew and the user-facing prose sanitizer, and asks the
-        provider for native structured output. That matters for a machine consumer,
-        because the sanitizer exists to make an answer speakable — it unwraps a JSON
-        object to the one field a voice assistant should read aloud, so a caller that
-        wanted the object gets a single value out of it instead. Pass ``json_schema``
-        as well to constrain decoding and have the engine validate before replying;
-        a response that does not parse or does not conform ends the run with an
-        error rather than a plausible-looking wrong answer.
+        Optional ``response_format`` / ``json_schema`` ask the engine for JSON
+        mode. Without them the answer is sanitized speakable prose, which unwraps
+        a directive object down to a single field.
         """
         if not self.is_active or self._ws is None:
             raise RuntimeError("Session bridge is not active — cannot run client.* agents")
@@ -461,10 +454,10 @@ class SessionBridge:
             payload["mcpProviderIds"] = mcp_provider_ids
         if images:
             payload["images"] = list(images)
-        if response_format:
-            payload["responseFormat"] = dict(response_format)
-        if json_schema:
-            payload["jsonSchema"] = dict(json_schema)
+        if response_format is not None:
+            payload["responseFormat"] = response_format
+        if json_schema is not None:
+            payload["jsonSchema"] = json_schema
         if priority is not None:
             payload["priority"] = priority
         await self._send(payload)
