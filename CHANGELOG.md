@@ -4,6 +4,8 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-14
+
 ### Changed
 
 - **Overlay packer for `type: object_detection`** — force `selfcontained: false`;
