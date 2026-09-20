@@ -154,6 +154,9 @@ class SessionBridge {
   /// Pass [onStatus] to stream user-friendly progress (`message`) while AO works.
   /// Failures throw [ReachRunException] with [ReachRunException.code] when AO sends one.
   ///
+  /// [timeout] is an **idle** budget (status/heartbeat/queue resets it); absolute
+  /// ceiling is `max(6×timeout, 30m)`.
+  ///
   /// Optional [images] — `[{mimeType, dataBase64, name?}, …]` in display order.
   /// AO routes those turns to a vision model; engines that predate the multimodal
   /// protocol ignore the field and answer from [text] alone.
@@ -204,7 +207,10 @@ class SessionBridge {
       ),
     );
     try {
-      return await pending.done.future.timeout(timeout);
+      return await pending.awaitWithIdleTimeout(
+        idleTimeout: timeout,
+        absoluteTimeout: _absoluteTimeoutFor(timeout),
+      );
     } on TimeoutException {
       _pendingRuns.remove(qid);
       try {
@@ -221,6 +227,9 @@ class SessionBridge {
   /// iterative is honored as a hint / for AO HTTP parity.
   ///
   /// [onStatus] receives processing/phase/`message` updates suitable for live UI text.
+  ///
+  /// [timeout] is an **idle** budget: each live status / heartbeat / queue update
+  /// resets it. Absolute wall-clock ceiling is `max(6×timeout, 30m)`.
   ///
   /// Optional [images] — see the [directAgent] multimodal extension.
   Future<Map<String, dynamic>> chat({
@@ -265,7 +274,10 @@ class SessionBridge {
       if (priority != null) 'priority': priority,
     });
     try {
-      return await pending.done.future.timeout(timeout);
+      return await pending.awaitWithIdleTimeout(
+        idleTimeout: timeout,
+        absoluteTimeout: _absoluteTimeoutFor(timeout),
+      );
     } on TimeoutException {
       _pendingRuns.remove(qid);
       try {
@@ -820,10 +832,33 @@ class SessionBridge {
 
   void _emitRunStatus(ReachRunStatus status, _PendingDirectRun? run) {
     run?.lastStatus = status;
+    // Queue waits + heartbeats count as live progress so idle timeout resets.
+    if (run != null && _statusShowsAlive(status)) {
+      run.noteProgress();
+    }
     run?.onStatus?.call(status);
     if (!_runStatusController.isClosed) {
       _runStatusController.add(status);
     }
+  }
+
+  /// True when AO is still working / queued (or heartbeat) — not a terminal end.
+  static bool _statusShowsAlive(ReachRunStatus status) {
+    if (status.isError || status.phase == 'done' || status.phase == 'cancelled') {
+      return false;
+    }
+    if (status.processing || status.isQueued || status.isPreempted) return true;
+    return status.raw['heartbeat'] == true;
+  }
+
+  /// Wall-clock ceiling while idle budget keeps resetting on status.
+  ///
+  /// Keeps long research/queue runs alive without letting a wedged AO hold the
+  /// client forever. Defaults to 6× idle, floored at 30 minutes.
+  static Duration _absoluteTimeoutFor(Duration idleTimeout) {
+    final sixFold = idleTimeout * 6;
+    const floor = Duration(minutes: 30);
+    return sixFold > floor ? sixFold : floor;
   }
 
   void _onRunStart(Map<String, dynamic> msg) {
@@ -861,6 +896,7 @@ class SessionBridge {
     if (qid == null) return;
     final run = _pendingRuns[qid];
     if (run == null) return;
+    run.noteProgress();
     if ((msg['stream']?.toString() ?? 'stdout') == 'stdout') {
       run.stdout.write(msg['text']?.toString() ?? '');
     }
@@ -1141,7 +1177,8 @@ class SessionBridge {
 }
 
 class _PendingDirectRun {
-  _PendingDirectRun({required this.questionId, this.onStatus});
+  _PendingDirectRun({required this.questionId, this.onStatus})
+      : lastProgressAt = DateTime.now();
 
   final String questionId;
   final void Function(ReachRunStatus status)? onStatus;
@@ -1150,4 +1187,74 @@ class _PendingDirectRun {
   String? lastError;
   String? lastErrorCode;
   ReachRunStatus? lastStatus;
+
+  /// Last time AO signaled the run is still alive (status / heartbeat / queue).
+  DateTime lastProgressAt;
+
+  void noteProgress([DateTime? at]) {
+    lastProgressAt = at ?? DateTime.now();
+  }
+
+  /// Wait for [done], treating [idleTimeout] as silence budget.
+  ///
+  /// Any [noteProgress] call resets the idle clock. [absoluteTimeout] is the
+  /// hard wall-clock ceiling regardless of heartbeats.
+  Future<Map<String, dynamic>> awaitWithIdleTimeout({
+    required Duration idleTimeout,
+    required Duration absoluteTimeout,
+    DateTime Function()? clock,
+  }) {
+    return awaitCompleterWithIdleTimeout(
+      done,
+      idleTimeout: idleTimeout,
+      absoluteTimeout: absoluteTimeout,
+      lastProgressAt: () => lastProgressAt,
+      clock: clock,
+    );
+  }
+}
+
+/// Shared idle-wait helper (unit-tested without a live WebSocket).
+///
+/// Completes when [done] completes. Throws [TimeoutException] when either:
+/// - no progress for [idleTimeout], or
+/// - wall time since start exceeds [absoluteTimeout].
+Future<T> awaitCompleterWithIdleTimeout<T>(
+  Completer<T> done, {
+  required Duration idleTimeout,
+  required Duration absoluteTimeout,
+  required DateTime Function() lastProgressAt,
+  DateTime Function()? clock,
+}) async {
+  final nowFn = clock ?? DateTime.now;
+  final started = nowFn();
+  while (!done.isCompleted) {
+    final now = nowFn();
+    final idleLeft = idleTimeout - now.difference(lastProgressAt());
+    final absLeft = absoluteTimeout - now.difference(started);
+    var slice = idleLeft < absLeft ? idleLeft : absLeft;
+    if (slice <= Duration.zero) {
+      throw TimeoutException(
+        'idle/absolute timeout (idle=$idleTimeout absolute=$absoluteTimeout)',
+      );
+    }
+    // Cap poll slice so progress between long abs windows is noticed promptly.
+    if (slice > idleTimeout) slice = idleTimeout;
+    try {
+      return await done.future.timeout(slice);
+    } on TimeoutException {
+      if (done.isCompleted) return await done.future;
+      final again = nowFn();
+      final idleExceeded =
+          again.difference(lastProgressAt()) >= idleTimeout;
+      final absExceeded = again.difference(started) >= absoluteTimeout;
+      if (idleExceeded || absExceeded) {
+        throw TimeoutException(
+          'idle/absolute timeout (idle=$idleTimeout absolute=$absoluteTimeout)',
+        );
+      }
+      // Progress arrived during the slice — loop and wait again.
+    }
+  }
+  return done.future;
 }
