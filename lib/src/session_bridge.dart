@@ -936,6 +936,7 @@ class SessionBridge {
         message: (err != null && err.isNotEmpty)
             ? err
             : (cancelled ? 'Cancelled.' : 'Request failed'),
+        detail: msg['detail']?.toString(),
         code: code,
         questionId: qid,
         runId: msg['run_id']?.toString() ?? msg['runId']?.toString(),

@@ -262,6 +262,54 @@ def test_cancel_run_end_raises_cancelled() -> None:
     asyncio.run(_run())
 
 
+def test_format_error_surfaces_detail_and_raw_text() -> None:
+    async def _run() -> None:
+        bridge = SessionBridge()
+        bridge.state = SessionBridgeState.ACTIVE
+        bridge._ws = object()
+
+        async def fake_send(payload: dict[str, object]) -> None:
+            return None
+
+        bridge._send = fake_send  # type: ignore[method-assign]
+        pending = asyncio.create_task(
+            bridge.direct_agent(
+                agent_provider_id="client.demo",
+                text="format this",
+                question_id="q-format",
+                timeout=5.0,
+            )
+        )
+        for _ in range(50):
+            if "q-format" in bridge._pending_runs:
+                break
+            await asyncio.sleep(0.01)
+        bridge._on_run_end(
+            {
+                "type": "run_end",
+                "questionId": "q-format",
+                "ok": False,
+                "code": "direct_agent_format",
+                "error": "Response format validation failed",
+                "detail": "missing required property: objective",
+                "text": '{"summary":"raw model response"}',
+            }
+        )
+        try:
+            await pending
+            raise AssertionError("expected ReachRunError")
+        except ReachRunError as err:
+            assert err.code == "direct_agent_format"
+            assert err.detail == "missing required property: objective"
+            assert err.raw_text == '{"summary":"raw model response"}'
+            assert str(err) == (
+                "Response format validation failed: "
+                "missing required property: objective"
+            )
+
+    asyncio.run(_run())
+
+
 def test_overlay_status_updates_register_progress() -> None:
     class _Pending:
         def done(self) -> bool:

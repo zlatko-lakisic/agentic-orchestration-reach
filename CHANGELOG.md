@@ -4,6 +4,12 @@ All notable changes to **agentic-orchestration-reach** (AO Reach) are documented
 
 ## [Unreleased]
 
+### Fixed
+
+- Surface structured-output failures completely: `ReachRunError` /
+  `ReachRunException` now retain the terminal frame's technical `detail` and raw
+  model `text`, and format errors include their detail in string output.
+
 ## [0.19.0] - 2026-09-14
 
 ### Changed

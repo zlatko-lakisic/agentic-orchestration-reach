@@ -120,6 +120,7 @@ class ReachRunException implements Exception {
     required this.message,
     this.code,
     this.detail,
+    this.rawText,
     this.questionId,
     this.runId,
     this.phase = 'error',
@@ -130,6 +131,7 @@ class ReachRunException implements Exception {
       message: status.message.isNotEmpty ? status.message : 'AO run failed',
       code: status.code,
       detail: status.detail,
+      rawText: status.raw['text']?.toString(),
       questionId: status.questionId,
       runId: status.runId,
       phase: status.phase,
@@ -139,6 +141,7 @@ class ReachRunException implements Exception {
   final String message;
   final String? code;
   final String? detail;
+  final String? rawText;
   final String? questionId;
   final String? runId;
   final String phase;
@@ -157,6 +160,12 @@ class ReachRunException implements Exception {
       );
 
   @override
-  String toString() =>
-      'ReachRunException(code=$code, message=$message, questionId=$questionId)';
+  String toString() {
+    final detailSuffix =
+        code == 'direct_agent_format' && detail?.isNotEmpty == true
+            ? ', detail=$detail'
+            : '';
+    return 'ReachRunException(code=$code, message=$message$detailSuffix, '
+        'questionId=$questionId)';
+  }
 }
