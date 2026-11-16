@@ -105,6 +105,7 @@ class ReachRunError(RuntimeError):
         *,
         code: str | None = None,
         detail: str | None = None,
+        raw_text: str | None = None,
         question_id: str | None = None,
         run_id: str | None = None,
         phase: str = "error",
@@ -113,6 +114,7 @@ class ReachRunError(RuntimeError):
         self.message = message
         self.code = code
         self.detail = detail
+        self.raw_text = raw_text
         self.question_id = question_id
         self.run_id = run_id
         self.phase = phase
@@ -127,10 +129,20 @@ class ReachRunError(RuntimeError):
             status.message or "AO run failed",
             code=status.code,
             detail=status.detail,
+            raw_text=(
+                str(status.raw["text"])
+                if status.raw.get("text") is not None
+                else None
+            ),
             question_id=status.question_id,
             run_id=status.run_id,
             phase=status.phase,
         )
+
+    def __str__(self) -> str:
+        if self.code == "direct_agent_format" and self.detail:
+            return f"{self.message}: {self.detail}"
+        return self.message
 
     def to_status(self) -> ReachRunStatus:
         return ReachRunStatus(

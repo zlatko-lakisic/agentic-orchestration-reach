@@ -728,6 +728,9 @@ class SessionBridge:
                     if err
                     else ("Cancelled." if cancelled else "Request failed")
                 ),
+                detail=(
+                    str(msg["detail"]) if msg.get("detail") is not None else None
+                ),
                 code=str(code) if code else None,
                 question_id=str(qid),
                 run_id=(str(msg["run_id"]) if msg.get("run_id") is not None else None),

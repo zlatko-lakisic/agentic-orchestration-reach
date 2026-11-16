@@ -466,9 +466,33 @@ void main() {
       'type': 'run_end',
       'questionId': 'q-err',
       'ok': false,
-      'error': 'boom',
+      'code': 'direct_agent_format',
+      'error': 'Response format validation failed',
+      'detail': 'missing required property: objective',
+      'text': '{"summary":"raw model response"}',
     });
-    await expectLater(run, throwsA(isA<ReachRunException>()));
+    await expectLater(
+      run,
+      throwsA(
+        isA<ReachRunException>()
+            .having((e) => e.code, 'code', 'direct_agent_format')
+            .having(
+              (e) => e.detail,
+              'detail',
+              'missing required property: objective',
+            )
+            .having(
+              (e) => e.rawText,
+              'rawText',
+              '{"summary":"raw model response"}',
+            )
+            .having(
+              (e) => e.toString(),
+              'toString',
+              contains('detail=missing required property: objective'),
+            ),
+      ),
+    );
   });
 
   test('cancel sends cancel frame and settles cancelled run_end', () async {
